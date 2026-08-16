@@ -60,6 +60,7 @@ enum
 };
 
 static const double kCarbonLoopWaitTimeout = 10.0;
+static constexpr auto kNavigationGestureEventType = static_cast<CGEventType>(NSEventTypeGesture);
 
 // Synthetic mouse button and drag events require event numbers on macOS 27 and later.
 static inline bool needsEventNumber()
@@ -878,12 +879,18 @@ void OSXComputer::screensaver(bool activate)
 
 void OSXComputer::resetOptions()
 {
-  // no options
+  m_navigationGesturesEnabled = false;
 }
 
-void OSXComputer::setOptions(const OptionsList &)
+void OSXComputer::setOptions(const OptionsList &options)
 {
-  // no options
+  if (options.size() % 2 != 0) {
+    LOG_ERR("options are the incorrect size, can not process them");
+    return;
+  }
+
+  m_navigationGesturesEnabled = navigationGesturesEnabledFromOptions(options, m_navigationGesturesEnabled);
+  LOG_VERBOSE("macOS navigation gesture forwarding: %s", m_navigationGesturesEnabled ? "enabled" : "disabled");
 }
 
 void OSXComputer::setSequenceNumber(uint32_t seqNum)
@@ -1720,6 +1727,30 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
     break;
   case NX_NULLEVENT:
     break;
+  case kNavigationGestureEventType: {
+    if (computer->m_isOnComputer || !computer->m_navigationGesturesEnabled) {
+      break;
+    }
+
+    NSEvent *nativeEvent = [NSEvent eventWithCGEvent:event];
+    if (nativeEvent == nil || nativeEvent.type != NSEventTypeSwipe) {
+      break;
+    }
+
+    const auto deltaX = static_cast<double>(nativeEvent.deltaX);
+    const auto button =
+        classifyNavigationGestureButton(type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX);
+    if (button == kButtonNone) {
+      break;
+    }
+
+    const auto mask = computer->m_keyState->getActiveModifiers();
+    computer->sendEvent(EventTypes::PrimaryComputerButtonDown, ButtonInfo::alloc(button, mask));
+    computer->sendEvent(EventTypes::PrimaryComputerButtonUp, ButtonInfo::alloc(button, mask));
+    LOG_DEBUG("forwarding macOS navigation gesture deltaX=%+.3f as button=%d", deltaX, button);
+    break;
+  }
+
   default:
     if (type == NX_SYSDEFINED) {
       if (isMediaKeyEvent(event)) {
@@ -1740,6 +1771,35 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
   } else {
     return nullptr;
   }
+}
+
+bool OSXComputer::navigationGesturesEnabledFromOptions(const OptionsList &options, bool currentValue)
+{
+  if (options.size() % 2 != 0) {
+    return currentValue;
+  }
+
+  for (size_t i = 0; i < options.size(); i += 2) {
+    if (options[i] == kOptionMacNavigationGestures) {
+      currentValue = options[i + 1] != 0;
+    }
+  }
+  return currentValue;
+}
+
+ButtonID OSXComputer::classifyNavigationGestureButton(CGEventType type, bool isOnComputer, bool enabled, double deltaX)
+{
+  if (type != kNavigationGestureEventType || isOnComputer || !enabled) {
+    return kButtonNone;
+  }
+
+  if (deltaX > 0.0) {
+    return kButtonExtra0;
+  }
+  if (deltaX < 0.0) {
+    return kButtonExtra1;
+  }
+  return kButtonNone;
 }
 
 void OSXComputer::MouseButtonState::set(uint32_t button, EMouseButtonState state)
