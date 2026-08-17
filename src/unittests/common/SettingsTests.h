@@ -12,6 +12,7 @@ class SettingsTests : public QObject
 {
   Q_OBJECT
 private Q_SLOTS:
+  void navigationGestureMappings_haveExpectedDefaults();
   void initTestCase();
   // Test are run in order top to bottom
   void setSettingsFile();

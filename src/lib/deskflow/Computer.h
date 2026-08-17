@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common/NavigationTypes.h"
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/IComputer.h"
 #include "deskflow/KeyTypes.h"
@@ -163,6 +164,9 @@ public:
   Each wheel click should generate a delta of +/-120.
   */
   void mouseWheel(int32_t xDelta, int32_t yDelta) const;
+
+  //! Perform a locally configured action for a navigation gesture slot.
+  void navigationGesture(NavigationActionSlot action);
 
   //! Notify of options changes
   /*!

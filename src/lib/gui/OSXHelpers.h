@@ -7,9 +7,13 @@
 
 #pragma once
 
+#include "common/NavigationTypes.h"
+
 #include <QString>
 
 #include <functional>
+
+class QWidget;
 
 void requestOSXNotificationPermission();
 bool isOSXDevelopmentBuild();
@@ -18,3 +22,4 @@ bool isOSXInterfaceStyleDark();
 void forceAppActive();
 void macOSNativeHide();
 void installQuitHandler(std::function<bool()> shouldQuit);
+NavigationGestureDirection recordMacNavigationGesture(QWidget *parent, const QString &actionName);

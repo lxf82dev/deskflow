@@ -8,6 +8,8 @@
 #include "deskflow/Computer.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "common/Settings.h"
+#include "deskflow/KeyMap.h"
 #include "deskflow/IPlatformComputer.h"
 
 #include <QProcess>
@@ -268,6 +270,49 @@ void Computer::mouseWheel(int32_t xDelta, int32_t yDelta) const
 {
   assert(!m_isPrimary);
   m_computer->fakeMouseWheel({xDelta, yDelta});
+}
+
+void Computer::navigationGesture(NavigationActionSlot action)
+{
+  if (action != NavigationActionSlot::Action1 && action != NavigationActionSlot::Action2) {
+    LOG_WARN("ignoring invalid navigation gesture action=%d", static_cast<int>(action));
+    return;
+  }
+
+  const bool isAction1 = action == NavigationActionSlot::Action1;
+  const auto actionKey =
+      isAction1 ? Settings::Client::NavigationGestureAction1 : Settings::Client::NavigationGestureAction2;
+  const auto shortcutKey =
+      isAction1 ? Settings::Client::NavigationGestureShortcut1 : Settings::Client::NavigationGestureShortcut2;
+  const auto output = static_cast<NavigationOutputAction>(Settings::value(actionKey).toInt());
+
+  if (output == NavigationOutputAction::Ignore) {
+    return;
+  }
+
+  if (output == NavigationOutputAction::Back || output == NavigationOutputAction::Forward) {
+    const ButtonID button = output == NavigationOutputAction::Back ? kButtonExtra0 : kButtonExtra1;
+    m_computer->fakeMouseButton(button, true);
+    m_computer->fakeMouseButton(button, false);
+    return;
+  }
+
+  if (output != NavigationOutputAction::Keystroke) {
+    LOG_WARN("ignoring invalid navigation gesture output=%d", static_cast<int>(output));
+    return;
+  }
+
+  auto shortcut = Settings::value(shortcutKey).toString().toStdString();
+  KeyModifierMask mask = 0;
+  KeyID key = kKeyNone;
+  if (!KeyMap::parseModifiers(shortcut, mask) || !KeyMap::parseKey(shortcut, key) || key == kKeyNone) {
+    LOG_WARN("ignoring invalid navigation gesture shortcut");
+    return;
+  }
+
+  const auto button = static_cast<KeyButton>(0x1f0 + static_cast<int>(action));
+  m_computer->fakeKeyDown(key, mask, button, {});
+  m_computer->fakeKeyUp(button);
 }
 
 void Computer::resetOptions()

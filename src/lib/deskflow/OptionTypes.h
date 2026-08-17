@@ -58,6 +58,8 @@ static const OptionID kOptionDisableLockToComputer = OPTION_CODE("DLTS");
 static const OptionID kOptionClipboardSharing = OPTION_CODE("CLPS");
 static const OptionID kOptionClipboardSharingSize = OPTION_CODE("CLSZ");
 static const OptionID kOptionMacNavigationGestures = OPTION_CODE("MNGS");
+static const OptionID kOptionMacNavigationGestureAction1 = OPTION_CODE("MNG1");
+static const OptionID kOptionMacNavigationGestureAction2 = OPTION_CODE("MNG2");
 //@}
 
 //! @name Computer switch corner masks

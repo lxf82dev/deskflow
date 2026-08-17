@@ -880,6 +880,8 @@ void OSXComputer::screensaver(bool activate)
 void OSXComputer::resetOptions()
 {
   m_navigationGesturesEnabled = false;
+  m_navigationGestureAction1 = NavigationGestureDirection::Left;
+  m_navigationGestureAction2 = NavigationGestureDirection::Right;
 }
 
 void OSXComputer::setOptions(const OptionsList &options)
@@ -890,6 +892,7 @@ void OSXComputer::setOptions(const OptionsList &options)
   }
 
   m_navigationGesturesEnabled = navigationGesturesEnabledFromOptions(options, m_navigationGesturesEnabled);
+  navigationDirectionsFromOptions(options, m_navigationGestureAction1, m_navigationGestureAction2);
   LOG_VERBOSE("macOS navigation gesture forwarding: %s", m_navigationGesturesEnabled ? "enabled" : "disabled");
 }
 
@@ -1738,19 +1741,23 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
     }
 
     const auto deltaX = static_cast<double>(nativeEvent.deltaX);
-    const auto button =
-        classifyNavigationGestureButton(type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX);
-    if (button == kButtonNone) {
+    const auto deltaY = static_cast<double>(nativeEvent.deltaY);
+    const auto direction =
+        classifyNavigationGesture(type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX, deltaY);
+    const auto action = navigationActionSlotForDirection(
+        direction, computer->m_navigationGestureAction1, computer->m_navigationGestureAction2
+    );
+    if (action == NavigationActionSlot::None) {
       break;
     }
 
-    const auto mask = computer->m_keyState->getActiveModifiers();
-    computer->sendEvent(EventTypes::PrimaryComputerButtonDown, ButtonInfo::alloc(button, mask));
-    computer->sendEvent(EventTypes::PrimaryComputerButtonUp, ButtonInfo::alloc(button, mask));
-    LOG_DEBUG("forwarding macOS navigation gesture deltaX=%+.3f as button=%d", deltaX, button);
+    computer->sendEvent(EventTypes::PrimaryComputerNavigationGesture, NavigationGestureInfo::alloc(action));
+    LOG_DEBUG(
+        "forwarding macOS navigation gesture deltaX=%+.3f deltaY=%+.3f as action=%d", deltaX, deltaY,
+        static_cast<int>(action)
+    );
     break;
   }
-
   default:
     if (type == NX_SYSDEFINED) {
       if (isMediaKeyEvent(event)) {
@@ -1787,19 +1794,53 @@ bool OSXComputer::navigationGesturesEnabledFromOptions(const OptionsList &option
   return currentValue;
 }
 
-ButtonID OSXComputer::classifyNavigationGestureButton(CGEventType type, bool isOnComputer, bool enabled, double deltaX)
+void OSXComputer::navigationDirectionsFromOptions(
+    const OptionsList &options, NavigationGestureDirection &action1, NavigationGestureDirection &action2
+)
 {
-  if (type != kNavigationGestureEventType || isOnComputer || !enabled) {
-    return kButtonNone;
+  if (options.size() % 2 != 0) {
+    return;
   }
 
-  if (deltaX > 0.0) {
-    return kButtonExtra0;
+  for (size_t i = 0; i < options.size(); i += 2) {
+    const auto direction = static_cast<NavigationGestureDirection>(options[i + 1]);
+    if (direction < NavigationGestureDirection::Left || direction > NavigationGestureDirection::Down) {
+      continue;
+    }
+
+    if (options[i] == kOptionMacNavigationGestureAction1) {
+      action1 = direction;
+    } else if (options[i] == kOptionMacNavigationGestureAction2) {
+      action2 = direction;
+    }
   }
-  if (deltaX < 0.0) {
-    return kButtonExtra1;
+}
+
+NavigationGestureDirection OSXComputer::classifyNavigationGesture(
+    CGEventType type, bool isOnComputer, bool enabled, double deltaX, double deltaY
+)
+{
+  if (type != kNavigationGestureEventType || isOnComputer || !enabled) {
+    return NavigationGestureDirection::None;
   }
-  return kButtonNone;
+
+  return navigationGestureDirectionFromDeltas(deltaX, deltaY);
+}
+
+NavigationActionSlot OSXComputer::navigationActionSlotForDirection(
+    NavigationGestureDirection direction, NavigationGestureDirection action1, NavigationGestureDirection action2
+)
+{
+  if (direction == NavigationGestureDirection::None) {
+    return NavigationActionSlot::None;
+  }
+  if (direction == action1) {
+    return NavigationActionSlot::Action1;
+  }
+  if (direction == action2) {
+    return NavigationActionSlot::Action2;
+  }
+  return NavigationActionSlot::None;
 }
 
 void OSXComputer::MouseButtonState::set(uint32_t button, EMouseButtonState state)

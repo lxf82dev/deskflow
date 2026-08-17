@@ -18,8 +18,13 @@
 #include "dialogs/HotkeyDialog.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
 
+#ifdef Q_OS_MACOS
+#include "gui/OSXHelpers.h"
+#endif
+
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSignalBlocker>
 
 using enum ComputerConfig::SwitchCorner;
 
@@ -49,6 +54,7 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
   if (!deskflow::platform::isWindows())
     ui->cbWin32KeepForeground->setVisible(false);
   ui->cbMacNavigationGestures->setVisible(deskflow::platform::isMac());
+  ui->widgetMacNavigationGestureMappings->setVisible(deskflow::platform::isMac());
   initConnections();
 }
 
@@ -91,6 +97,12 @@ void ServerConfigDialog::save()
   Settings::setValue(Settings::Server::SwitchDoubleTap, m_switchDoubleTap);
   Settings::setValue(Settings::Server::RelativeMouseMoves, m_relativeMouseMoves);
   Settings::setValue(Settings::Server::MacNavigationGesturesEnabled, m_macNavigationGesturesEnabled);
+  Settings::setValue(
+      Settings::Server::MacNavigationGestureAction1, static_cast<int>(m_macNavigationGestureAction1)
+  );
+  Settings::setValue(
+      Settings::Server::MacNavigationGestureAction2, static_cast<int>(m_macNavigationGestureAction2)
+  );
   Settings::setValue(Settings::Server::Win32KeepForeground, m_win32keepForeground);
   Settings::setValue(Settings::Server::ExternalConfig, ui->groupExternalConfig->isChecked());
   Settings::setValue(Settings::Server::ExternalConfigFile, ui->lineConfigFile->text());
@@ -282,8 +294,63 @@ void ServerConfigDialog::toggleRelativeMouseMoves(bool enabled)
 
 void ServerConfigDialog::toggleMacNavigationGestures(bool enabled)
 {
+  ui->widgetMacNavigationGestureMappings->setEnabled(enabled && Settings::isWritable());
+  if (m_macNavigationGesturesEnabled == enabled)
+    return;
   m_macNavigationGesturesEnabled = enabled;
   setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::setMacNavigationGestureAction1(int index)
+{
+  const auto direction = static_cast<NavigationGestureDirection>(index + 1);
+  if (direction == m_macNavigationGestureAction1)
+    return;
+
+  const auto previous = m_macNavigationGestureAction1;
+  m_macNavigationGestureAction1 = direction;
+  if (m_macNavigationGestureAction2 == direction) {
+    m_macNavigationGestureAction2 = previous;
+    const QSignalBlocker blocker(ui->comboMacNavigationAction2);
+    ui->comboMacNavigationAction2->setCurrentIndex(static_cast<int>(previous) - 1);
+  }
+  setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::setMacNavigationGestureAction2(int index)
+{
+  const auto direction = static_cast<NavigationGestureDirection>(index + 1);
+  if (direction == m_macNavigationGestureAction2)
+    return;
+
+  const auto previous = m_macNavigationGestureAction2;
+  m_macNavigationGestureAction2 = direction;
+  if (m_macNavigationGestureAction1 == direction) {
+    m_macNavigationGestureAction1 = previous;
+    const QSignalBlocker blocker(ui->comboMacNavigationAction1);
+    ui->comboMacNavigationAction1->setCurrentIndex(static_cast<int>(previous) - 1);
+  }
+  setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::detectMacNavigationGestureAction1()
+{
+#ifdef Q_OS_MACOS
+  const auto direction = recordMacNavigationGesture(this, tr("Action 1"));
+  if (direction != NavigationGestureDirection::None) {
+    ui->comboMacNavigationAction1->setCurrentIndex(static_cast<int>(direction) - 1);
+  }
+#endif
+}
+
+void ServerConfigDialog::detectMacNavigationGestureAction2()
+{
+#ifdef Q_OS_MACOS
+  const auto direction = recordMacNavigationGesture(this, tr("Action 2"));
+  if (direction != NavigationGestureDirection::None) {
+    ui->comboMacNavigationAction2->setCurrentIndex(static_cast<int>(direction) - 1);
+  }
+#endif
 }
 
 void ServerConfigDialog::toggleProtocol()
@@ -394,6 +461,8 @@ bool ServerConfigDialog::browseConfigFile()
 void ServerConfigDialog::loadFromConfig()
 {
   m_macNavigationGesturesEnabled = Settings::value(Settings::Server::MacNavigationGesturesEnabled).toBool();
+  m_macNavigationGestureAction1 = static_cast<NavigationGestureDirection>(Settings::value(Settings::Server::MacNavigationGestureAction1).toInt());
+  m_macNavigationGestureAction2 = static_cast<NavigationGestureDirection>(Settings::value(Settings::Server::MacNavigationGestureAction2).toInt());
   m_protocol = Settings::networkProtocol();
   m_enableHeartbeat = Settings::value(Settings::Server::EnableHeartbeat).toBool();
   m_heartbeatRate = Settings::value(Settings::Server::Heartbeat).toInt();
@@ -455,6 +524,13 @@ void ServerConfigDialog::refreshControls()
   ui->sbHeartbeat->setValue(m_heartbeatRate);
   ui->cbRelativeMouseMoves->setChecked(m_relativeMouseMoves);
   ui->cbMacNavigationGestures->setChecked(m_macNavigationGesturesEnabled);
+  {
+    const QSignalBlocker first(ui->comboMacNavigationAction1);
+    const QSignalBlocker second(ui->comboMacNavigationAction2);
+    ui->comboMacNavigationAction1->setCurrentIndex(static_cast<int>(m_macNavigationGestureAction1) - 1);
+    ui->comboMacNavigationAction2->setCurrentIndex(static_cast<int>(m_macNavigationGestureAction2) - 1);
+  }
+  ui->widgetMacNavigationGestureMappings->setEnabled(m_macNavigationGesturesEnabled && Settings::isWritable());
   ui->cbWin32KeepForeground->setChecked(m_win32keepForeground);
   ui->cbSwitchDelay->setChecked(m_enableSwitchDelay);
   ui->sbSwitchDelay->setEnabled(ui->cbSwitchDelay->isChecked());
@@ -510,6 +586,22 @@ void ServerConfigDialog::initConnections() const
   );
 
   connect(ui->cbRelativeMouseMoves, &QCheckBox::toggled, this, &ServerConfigDialog::toggleRelativeMouseMoves);
+  connect(
+      ui->comboMacNavigationAction1, &QComboBox::currentIndexChanged, this,
+      &ServerConfigDialog::setMacNavigationGestureAction1
+  );
+  connect(
+      ui->comboMacNavigationAction2, &QComboBox::currentIndexChanged, this,
+      &ServerConfigDialog::setMacNavigationGestureAction2
+  );
+  connect(
+      ui->buttonDetectMacNavigationAction1, &QPushButton::clicked, this,
+      &ServerConfigDialog::detectMacNavigationGestureAction1
+  );
+  connect(
+      ui->buttonDetectMacNavigationAction2, &QPushButton::clicked, this,
+      &ServerConfigDialog::detectMacNavigationGestureAction2
+  );
   connect(ui->cbEnableClipboard, &QCheckBox::toggled, this, &ServerConfigDialog::toggleClipboard);
   connect(ui->btnBrowseConfigFile, &QPushButton::clicked, this, &ServerConfigDialog::browseConfigFile);
   connect(ui->groupExternalConfig, &QGroupBox::toggled, this, &ServerConfigDialog::toggleExternalConfig);
@@ -556,6 +648,8 @@ void ServerConfigDialog::restoreFromDefaults()
   m_protocol = networkProtocolFromString(Settings::defaultValue(Settings::Server::Protocol).toString());
   m_enableHeartbeat = Settings::defaultValue(Settings::Server::EnableHeartbeat).toBool();
   m_heartbeatRate = Settings::defaultValue(Settings::Server::Heartbeat).toInt();
+  m_macNavigationGestureAction1 = static_cast<NavigationGestureDirection>(Settings::defaultValue(Settings::Server::MacNavigationGestureAction1).toInt());
+  m_macNavigationGestureAction2 = static_cast<NavigationGestureDirection>(Settings::defaultValue(Settings::Server::MacNavigationGestureAction2).toInt());
   m_relativeMouseMoves = Settings::defaultValue(Settings::Server::RelativeMouseMoves).toBool();
   m_macNavigationGesturesEnabled = Settings::defaultValue(Settings::Server::MacNavigationGesturesEnabled).toBool();
   m_win32keepForeground = Settings::defaultValue(Settings::Server::Win32KeepForeground).toBool();
@@ -615,6 +709,8 @@ bool ServerConfigDialog::isGeneralConfigModified() const
          m_enableSwitchDoubleTap != Settings::value(Settings::Server::EnableSwitchDoubleTap).toBool() ||
          m_switchDoubleTap != Settings::value(Settings::Server::SwitchDoubleTap).toInt() ||
          m_macNavigationGesturesEnabled != Settings::value(Settings::Server::MacNavigationGesturesEnabled).toBool() ||
+         static_cast<int>(m_macNavigationGestureAction1) != Settings::value(Settings::Server::MacNavigationGestureAction1).toInt() ||
+         static_cast<int>(m_macNavigationGestureAction2) != Settings::value(Settings::Server::MacNavigationGestureAction2).toInt() ||
          m_relativeMouseMoves != Settings::value(Settings::Server::RelativeMouseMoves).toBool() ||
          m_win32keepForeground != Settings::value(Settings::Server::Win32KeepForeground).toBool() ||
          m_disableLockToComputer != Settings::value(Settings::Server::DisableLockToComputer).toBool() ||
@@ -635,6 +731,8 @@ bool ServerConfigDialog::isGeneralConfigDefault() const
          m_enableSwitchDoubleTap == Settings::defaultValue(Settings::Server::EnableSwitchDoubleTap).toBool() &&
          m_switchDoubleTap == Settings::defaultValue(Settings::Server::SwitchDoubleTap).toInt() &&
          m_macNavigationGesturesEnabled == Settings::defaultValue(Settings::Server::MacNavigationGesturesEnabled).toBool() &&
+         static_cast<int>(m_macNavigationGestureAction1) == Settings::defaultValue(Settings::Server::MacNavigationGestureAction1).toInt() &&
+         static_cast<int>(m_macNavigationGestureAction2) == Settings::defaultValue(Settings::Server::MacNavigationGestureAction2).toInt() &&
          m_relativeMouseMoves == Settings::defaultValue(Settings::Server::RelativeMouseMoves).toBool() &&
          m_win32keepForeground == Settings::defaultValue(Settings::Server::Win32KeepForeground).toBool() &&
          m_disableLockToComputer == Settings::defaultValue(Settings::Server::DisableLockToComputer).toBool() &&

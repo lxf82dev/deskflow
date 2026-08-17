@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common/NavigationTypes.h"
 #include "deskflow/IClient.h"
 
 namespace deskflow {
@@ -80,6 +81,7 @@ public:
   virtual void fileChunkSending(uint8_t mark, char *data, size_t dataSize) = 0;
   virtual std::string getSecureInputApp() const = 0;
   virtual void secureInputNotification(const std::string &app) const = 0;
+  virtual void navigationGesture(NavigationActionSlot action);
   std::string getName() const override;
   virtual deskflow::IStream *getStream() const = 0;
 

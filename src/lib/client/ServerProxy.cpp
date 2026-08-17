@@ -229,6 +229,10 @@ ServerProxy::ConnectionResult ServerProxy::parseMessage(const uint8_t *code)
     mouseWheel();
   }
 
+  else if (memcmp(code, kMsgDNavigationGesture, 4) == 0) {
+    navigationGesture();
+  }
+
   else if (memcmp(code, kMsgDKeyDown1_1, 4) == 0) {
     uint16_t id = 0;
     uint16_t mask = 0;
@@ -646,6 +650,22 @@ void ServerProxy::mouseUp()
 
   // forward
   m_client->mouseUp(static_cast<ButtonID>(id));
+}
+
+void ServerProxy::navigationGesture()
+{
+  flushCompressedMouse();
+
+  int8_t action = 0;
+  ProtocolUtil::readf(m_stream, kMsgDNavigationGesture + 4, &action);
+  LOG_VERBOSE("recv navigation gesture action=%d", action);
+
+  if (action < static_cast<int8_t>(NavigationActionSlot::Action1) ||
+      action > static_cast<int8_t>(NavigationActionSlot::Action2)) {
+    LOG_WARN("ignoring invalid navigation gesture action=%d", action);
+    return;
+  }
+  m_client->navigationGesture(static_cast<NavigationActionSlot>(action));
 }
 
 void ServerProxy::mouseMove()

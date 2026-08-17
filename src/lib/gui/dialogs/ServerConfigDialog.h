@@ -10,6 +10,7 @@
 #pragma once
 
 #include "ComputerSetupModel.h"
+#include "common/NavigationTypes.h"
 #include "common/NetworkProtocol.h"
 #include "config/ServerConfig.h"
 
@@ -68,6 +69,10 @@ protected:
 
   void toggleRelativeMouseMoves(bool enabled);
   void toggleMacNavigationGestures(bool enabled);
+  void setMacNavigationGestureAction1(int index);
+  void setMacNavigationGestureAction2(int index);
+  void detectMacNavigationGestureAction1();
+  void detectMacNavigationGestureAction2();
   void toggleProtocol();
 
   void toggleExternalConfig(bool enable = false);
@@ -113,6 +118,8 @@ private:
   uint m_clipboardSize;
   bool m_relativeMouseMoves;
   bool m_macNavigationGesturesEnabled;
+  NavigationGestureDirection m_macNavigationGestureAction1 = NavigationGestureDirection::Left;
+  NavigationGestureDirection m_macNavigationGestureAction2 = NavigationGestureDirection::Right;
   bool m_enableSwitchDelay;
   bool m_enableSwitchDoubleTap;
   bool m_originalServerConfigIsExternal;

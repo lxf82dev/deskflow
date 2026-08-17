@@ -18,6 +18,9 @@
 
 #import <QtGlobal>
 
+#include <QMessageBox>
+#include <QObject>
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -155,4 +158,38 @@ void installQuitHandler(std::function<bool()> shouldQuit)
                                                                 Q_UNUSED(note)
                                                                 s_isSystemShuttingDown = YES;
                                                               }];
+}
+
+NavigationGestureDirection recordMacNavigationGesture(QWidget *parent, const QString &actionName)
+{
+  QMessageBox dialog(parent);
+  dialog.setIcon(QMessageBox::Information);
+  dialog.setWindowTitle(QObject::tr("Detect navigation gesture"));
+  dialog.setText(QObject::tr("Press the Options+ action to use for %1.").arg(actionName));
+  dialog.setInformativeText(
+      QObject::tr("Deskflow can detect horizontal or vertical macOS swipe events. Cancel if this action produces a "
+                  "standard key, mouse event, or an unsupported system action.")
+  );
+  dialog.setStandardButtons(QMessageBox::Cancel);
+
+  __block NavigationGestureDirection direction = NavigationGestureDirection::None;
+  QMessageBox *dialogPtr = &dialog;
+  id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskSwipe
+                                                     handler:^NSEvent *(NSEvent *event) {
+                                                       direction = navigationGestureDirectionFromDeltas(
+                                                           static_cast<double>(event.deltaX),
+                                                           static_cast<double>(event.deltaY)
+                                                       );
+                                                       if (direction != NavigationGestureDirection::None) {
+                                                         dialogPtr->accept();
+                                                         return nil;
+                                                       }
+                                                       return event;
+                                                     }];
+
+  dialog.exec();
+  if (monitor != nil) {
+    [NSEvent removeMonitor:monitor];
+  }
+  return direction;
 }

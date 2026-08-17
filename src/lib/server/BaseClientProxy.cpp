@@ -28,6 +28,21 @@ void BaseClientProxy::getJumpCursorPos(int32_t &x, int32_t &y) const
   y = m_y;
 }
 
+void BaseClientProxy::navigationGesture(NavigationActionSlot action)
+{
+  ButtonID button = kButtonNone;
+  if (action == NavigationActionSlot::Action1) {
+    button = kButtonExtra0;
+  } else if (action == NavigationActionSlot::Action2) {
+    button = kButtonExtra1;
+  }
+
+  if (button != kButtonNone) {
+    mouseDown(button);
+    mouseUp(button);
+  }
+}
+
 std::string BaseClientProxy::getName() const
 {
   return m_name;

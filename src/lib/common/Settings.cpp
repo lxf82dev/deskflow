@@ -7,6 +7,7 @@
 #include "Settings.h"
 
 #include "LogLevel.h"
+#include "NavigationTypes.h"
 #include "NetworkProtocol.h"
 #include "UrlConstants.h"
 #include "common/KeyboardModifier.h"
@@ -356,6 +357,21 @@ QVariant Settings::defaultValue(const QString &key)
 
   if (key == Client::YScrollScale || key == Client::XScrollScale)
     return 1.0;
+
+  if (key == Server::MacNavigationGestureAction1)
+    return static_cast<int>(NavigationGestureDirection::Left);
+
+  if (key == Server::MacNavigationGestureAction2)
+    return static_cast<int>(NavigationGestureDirection::Right);
+
+  if (key == Client::NavigationGestureAction1)
+    return static_cast<int>(NavigationOutputAction::Back);
+
+  if (key == Client::NavigationGestureAction2)
+    return static_cast<int>(NavigationOutputAction::Forward);
+
+  if (key == Client::NavigationGestureShortcut1 || key == Client::NavigationGestureShortcut2)
+    return QString();
 
   if (key == Server::Protocol)
     return networkProtocolToOption(NetworkProtocol::Barrier);

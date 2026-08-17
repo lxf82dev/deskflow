@@ -111,4 +111,14 @@ void SettingsTests::checkClearState()
   QVERIFY(!Settings::value(Settings::Gui::WindowGeometry).toRect().isValid());
 }
 
+void SettingsTests::navigationGestureMappings_haveExpectedDefaults()
+{
+  QCOMPARE(Settings::defaultValue(Settings::Server::MacNavigationGestureAction1).toInt(), 1);
+  QCOMPARE(Settings::defaultValue(Settings::Server::MacNavigationGestureAction2).toInt(), 2);
+  QCOMPARE(Settings::defaultValue(Settings::Client::NavigationGestureAction1).toInt(), 1);
+  QCOMPARE(Settings::defaultValue(Settings::Client::NavigationGestureAction2).toInt(), 2);
+  QCOMPARE(Settings::defaultValue(Settings::Client::NavigationGestureShortcut1).toString(), QString());
+  QCOMPARE(Settings::defaultValue(Settings::Client::NavigationGestureShortcut2).toString(), QString());
+}
+
 QTEST_MAIN(SettingsTests)

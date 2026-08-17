@@ -17,6 +17,7 @@ class KeySequence
 public:
   KeySequence() = default;
 
+  static KeySequence fromString(const QString &text);
   QString toString() const;
   bool appendKey(int key, int modifiers);
   bool appendMouseButton(int button);
@@ -39,6 +40,7 @@ public:
   bool operator==(const KeySequence &ks) const = default;
 
 private:
+  static int keyFromString(const QString &text);
   void setValid(bool b)
   {
     m_IsValid = b;
