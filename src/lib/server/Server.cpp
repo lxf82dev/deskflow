@@ -81,7 +81,8 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   });
   m_events->addHandler(
       EventTypes::PrimaryComputerNavigationGesture, m_primaryClient->getEventTarget(),
-      [this](const auto &e) { handleNavigationGestureEvent(e); });
+      [this](const auto &e) { handleNavigationGestureEvent(e); }
+  );
   m_events->addHandler(
       EventTypes::PrimaryComputerMotionOnPrimary, m_primaryClient->getEventTarget(),
       [this](const auto &e) { handleMotionPrimaryEvent(e); }

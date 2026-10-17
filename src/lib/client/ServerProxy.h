@@ -73,6 +73,7 @@ protected:
   }
 
 private:
+  friend class ServerProxyTests;
   // if compressing mouse motion then send the last motion now
   void flushCompressedMouse();
 

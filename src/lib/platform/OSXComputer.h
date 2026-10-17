@@ -315,7 +315,12 @@ private:
   static bool s_testedForGHOM;
   static bool s_hasGHOM;
 
+  static CGEventRef handleOptionsInputEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
+
   // Quartz input event support
+  bool m_optionsCompatibilityEnabled = false;
+  CFMachPortRef m_optionsTapPort = nullptr;
+  CFRunLoopSourceRef m_optionsTapRLSR = nullptr;
   CFMachPortRef m_eventTapPort;
   CFRunLoopSourceRef m_eventTapRLSR;
   std::thread m_eventTapThread;

@@ -22,6 +22,7 @@ private Q_SLOTS:
   void keyRepeat();
   void keyUp_data();
   void keyUp();
+  void navigationGesture_nativeAndLegacyPackets();
 
 private:
   Log m_log;

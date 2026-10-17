@@ -328,4 +328,17 @@ void ServerProxyTests::parseHandshakeMessage_protocolError_queuesRefusalRequest(
   QCOMPARE(QString::fromUtf8(request->message()), QStringLiteral("server reported a protocol error"));
 }
 
+void ServerProxyTests::navigationGesture_invalidSlots_areIgnored()
+{
+  for (int8_t slot : {int8_t(0), int8_t(3), int8_t(-1)}) {
+    FakeStream stream;
+    stream.push(std::string(1, static_cast<char>(slot)));
+    RecordingEventQueue events;
+    ServerProxy proxy(undereferenceableClient(), &stream, &events);
+    proxy.handleMessage(reinterpret_cast<const uint8_t *>("DNGS"));
+    QCOMPARE(stream.getSize(), uint32_t(0));
+    QVERIFY(events.addedEvents().empty());
+  }
+}
+
 QTEST_MAIN(ServerProxyTests)

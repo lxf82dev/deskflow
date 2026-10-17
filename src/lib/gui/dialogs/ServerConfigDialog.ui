@@ -368,6 +368,12 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="cbMacOptionsCompatibility">
+            <property name="text"><string>Enable Logi Options+ input compatibility</string></property>
+            <property name="toolTip"><string>Forward Options+ middle clicks to the client and keep local Shift releases synchronized after switching computers.</string></property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="cbMacNavigationGestures">
             <property name="text">
              <string>Forward macOS navigation gestures</string>

@@ -9,8 +9,8 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "common/Settings.h"
-#include "deskflow/KeyMap.h"
 #include "deskflow/IPlatformComputer.h"
+#include "deskflow/KeyMap.h"
 
 #include <QProcess>
 
@@ -291,9 +291,18 @@ void Computer::navigationGesture(NavigationActionSlot action)
   }
 
   if (output == NavigationOutputAction::Back || output == NavigationOutputAction::Forward) {
+#ifdef Q_OS_MACOS
+    // macOS applications do not consistently interpret extra mouse buttons
+    // as navigation. Use the same native shortcuts as the validated relay.
+    const KeyID key = output == NavigationOutputAction::Back ? '[' : ']';
+    const auto button = static_cast<KeyButton>(0x1f0 + static_cast<int>(action));
+    m_computer->fakeKeyDown(key, KeyModifierSuper, button, {});
+    m_computer->fakeKeyUp(button);
+#else
     const ButtonID button = output == NavigationOutputAction::Back ? kButtonExtra0 : kButtonExtra1;
     m_computer->fakeMouseButton(button, true);
     m_computer->fakeMouseButton(button, false);
+#endif
     return;
   }
 

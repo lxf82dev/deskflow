@@ -42,24 +42,20 @@ void OSXComputerTests::navigationGesturesEnabledFromOptions_malformedOptions_pre
 void OSXComputerTests::classifyNavigationGesture_swipeLeft_returnsLeft()
 {
   QCOMPARE(
-      OSXComputer::classifyNavigationGesture(kGestureType, false, true, 1.0, 0.0),
-      NavigationGestureDirection::Left
+      OSXComputer::classifyNavigationGesture(kGestureType, false, true, 1.0, 0.0), NavigationGestureDirection::Left
   );
 }
 
 void OSXComputerTests::classifyNavigationGesture_swipeRight_returnsRight()
 {
   QCOMPARE(
-      OSXComputer::classifyNavigationGesture(kGestureType, false, true, -1.0, 0.0),
-      NavigationGestureDirection::Right
+      OSXComputer::classifyNavigationGesture(kGestureType, false, true, -1.0, 0.0), NavigationGestureDirection::Right
   );
 }
 
 void OSXComputerTests::classifyNavigationGesture_swipeUp_returnsUp()
 {
-  QCOMPARE(
-      OSXComputer::classifyNavigationGesture(kGestureType, false, true, 0.0, 1.0), NavigationGestureDirection::Up
-  );
+  QCOMPARE(OSXComputer::classifyNavigationGesture(kGestureType, false, true, 0.0, 1.0), NavigationGestureDirection::Up);
 }
 
 void OSXComputerTests::classifyNavigationGesture_swipeDown_returnsDown()
@@ -79,8 +75,7 @@ void OSXComputerTests::classifyNavigationGesture_ambiguousDelta_returnsNone()
 void OSXComputerTests::classifyNavigationGesture_disabled_returnsNone()
 {
   QCOMPARE(
-      OSXComputer::classifyNavigationGesture(kGestureType, false, false, 1.0, 0.0),
-      NavigationGestureDirection::None
+      OSXComputer::classifyNavigationGesture(kGestureType, false, false, 1.0, 0.0), NavigationGestureDirection::None
   );
 }
 

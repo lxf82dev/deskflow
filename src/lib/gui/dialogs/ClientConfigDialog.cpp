@@ -7,9 +7,9 @@
 #include "ClientConfigDialog.h"
 #include "ui_ClientConfigDialog.h"
 
-#include "common/Settings.h"
-#include "common/NavigationTypes.h"
 #include "common/KeySequence.h"
+#include "common/NavigationTypes.h"
+#include "common/Settings.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
 
 #include <QPushButton>
@@ -195,11 +195,7 @@ void ClientConfigDialog::save()
   Settings::setValue(Settings::Client::XScrollScale, ui->sbXScrollScale->value());
   Settings::setValue(Settings::Client::NavigationGestureAction1, ui->comboNavigationAction1->currentIndex());
   Settings::setValue(Settings::Client::NavigationGestureAction2, ui->comboNavigationAction2->currentIndex());
-  Settings::setValue(
-      Settings::Client::NavigationGestureShortcut1, ui->keyNavigationAction1->keySequence().toString()
-  );
-  Settings::setValue(
-      Settings::Client::NavigationGestureShortcut2, ui->keyNavigationAction2->keySequence().toString()
-  );
+  Settings::setValue(Settings::Client::NavigationGestureShortcut1, ui->keyNavigationAction1->keySequence().toString());
+  Settings::setValue(Settings::Client::NavigationGestureShortcut2, ui->keyNavigationAction2->keySequence().toString());
   QDialog::accept();
 }

@@ -110,6 +110,7 @@ public:
     inline static const auto DefaultLockToComputerState = QStringLiteral("server/defaultLockToComputerState");
     inline static const auto DisableLockToComputer = QStringLiteral("server/disableLockToComputer");
     inline static const auto EnableClipboard = QStringLiteral("server/enableClipboard");
+    inline static const auto MacOptionsCompatibilityEnabled = QStringLiteral("server/macOptionsCompatibilityEnabled");
     inline static const auto MacNavigationGesturesEnabled = QStringLiteral("server/macNavigationGesturesEnabled");
     inline static const auto MacNavigationGestureAction1 = QStringLiteral("server/macNavigationGestureAction1");
     inline static const auto MacNavigationGestureAction2 = QStringLiteral("server/macNavigationGestureAction2");
@@ -335,6 +336,7 @@ private:
     , Server::EnableClipboard
     , Server::MacNavigationGestureAction1
     , Server::MacNavigationGestureAction2
+    , Server::MacOptionsCompatibilityEnabled
     , Server::MacNavigationGesturesEnabled
     , Server::EnableHeartbeat
     , Server::EnableSwitchDelay
@@ -371,6 +373,7 @@ private:
     , Log::GuiDebug
     , Server::DefaultLockToComputerState
     , Server::DisableLockToComputer
+    , Server::MacOptionsCompatibilityEnabled
     , Server::MacNavigationGesturesEnabled
     , Server::EnableHeartbeat
     , Server::EnableSwitchDelay

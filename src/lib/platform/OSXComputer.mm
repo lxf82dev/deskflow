@@ -28,6 +28,7 @@
 #include "mt/Thread.h"
 #include "platform/OSXClipboard.h"
 #include "platform/OSXEventQueueBuffer.h"
+#include "platform/OSXInputCompatibility.h"
 #include "platform/OSXKeyState.h"
 #include "platform/OSXMediaKeySupport.h"
 #include "platform/OSXPasteboardPeeker.h"
@@ -705,6 +706,17 @@ void OSXComputer::enable()
         kCGHIDEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, kCGEventMaskForAllEvents, handleCGInputEvent,
         this
     );
+    // Options+ posts middle clicks at SESSION, after our HID capture point.
+    // A real HID middle click is consumed by the primary tap while remote,
+    // so only downstream-injected clicks reach this compatibility tap.
+    m_optionsTapPort = CGEventTapCreate(
+        kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault,
+        CGEventMaskBit(kCGEventOtherMouseDown) | CGEventMaskBit(kCGEventOtherMouseUp), handleOptionsInputEvent, this
+    );
+    if (m_optionsTapPort)
+      m_optionsTapRLSR = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_optionsTapPort, 0);
+    if (!m_optionsTapRLSR)
+      LOG_WARN("Options+ session tap is unavailable; middle-click compatibility requires Accessibility access");
   } else {
     // FIXME -- prevent system from entering power save mode
 
@@ -732,8 +744,12 @@ void OSXComputer::enable()
       m_eventTapThread = std::thread([this, sem]() {
         m_eventTapRunLoop = CFRunLoopGetCurrent();
         CFRunLoopAddSource(m_eventTapRunLoop, m_eventTapRLSR, kCFRunLoopDefaultMode);
+        if (m_optionsTapRLSR)
+          CFRunLoopAddSource(m_eventTapRunLoop, m_optionsTapRLSR, kCFRunLoopDefaultMode);
         dispatch_semaphore_signal(sem);
         CFRunLoopRun();
+        if (m_optionsTapRLSR)
+          CFRunLoopRemoveSource(CFRunLoopGetCurrent(), m_optionsTapRLSR, kCFRunLoopDefaultMode);
         CFRunLoopRemoveSource(CFRunLoopGetCurrent(), m_eventTapRLSR, kCFRunLoopDefaultMode);
         m_eventTapRunLoop = nullptr;
       });
@@ -758,6 +774,16 @@ void OSXComputer::disable()
   }
   if (m_eventTapThread.joinable()) {
     m_eventTapThread.join();
+  }
+
+  if (m_optionsTapPort) {
+    CGEventTapEnable(m_optionsTapPort, false);
+    CFMachPortInvalidate(m_optionsTapPort);
+    if (m_optionsTapRLSR)
+      CFRelease(m_optionsTapRLSR);
+    CFRelease(m_optionsTapPort);
+    m_optionsTapRLSR = nullptr;
+    m_optionsTapPort = nullptr;
   }
 
   if (m_eventTapRLSR) {
@@ -879,6 +905,7 @@ void OSXComputer::screensaver(bool activate)
 
 void OSXComputer::resetOptions()
 {
+  m_optionsCompatibilityEnabled = false;
   m_navigationGesturesEnabled = false;
   m_navigationGestureAction1 = NavigationGestureDirection::Left;
   m_navigationGestureAction2 = NavigationGestureDirection::Right;
@@ -891,6 +918,10 @@ void OSXComputer::setOptions(const OptionsList &options)
     return;
   }
 
+  for (size_t i = 0; i < options.size(); i += 2) {
+    if (options[i] == kOptionMacOptionsCompatibility)
+      m_optionsCompatibilityEnabled = options[i + 1] != 0;
+  }
   m_navigationGesturesEnabled = navigationGesturesEnabledFromOptions(options, m_navigationGesturesEnabled);
   navigationDirectionsFromOptions(options, m_navigationGestureAction1, m_navigationGestureAction2);
   LOG_VERBOSE("macOS navigation gesture forwarding: %s", m_navigationGesturesEnabled ? "enabled" : "disabled");
@@ -1683,6 +1714,33 @@ OSXComputer::handleCGInputEventSecondary(CGEventTapProxy proxy, CGEventType type
   return event;
 }
 
+CGEventRef OSXComputer::handleOptionsInputEvent(CGEventTapProxy, CGEventType type, CGEventRef event, void *refcon)
+{
+  auto *computer = static_cast<OSXComputer *>(refcon);
+  if (type == kCGEventTapDisabledByTimeout) {
+    if (computer->checkAXPermissions())
+      CGEventTapEnable(computer->m_optionsTapPort, true);
+    return event;
+  }
+  if (type == kCGEventTapDisabledByUserInput) {
+    LOG_ERR("Options+ session tap was disabled by user input");
+    return event;
+  }
+  if (!computer->m_optionsCompatibilityEnabled || computer->m_isOnComputer)
+    return event;
+  if (!deskflow::platform::osx::shouldRelayMiddleClick(
+          type, event, computer->m_isOnComputer, computer->m_optionsCompatibilityEnabled,
+          deskflow::platform::osx::isOptionsAgentEvent(event)
+      ))
+    return event;
+  auto replacement = deskflow::platform::osx::copyCompatibilityEvent(event);
+  if (!replacement)
+    return event;
+  CGEventPost(kCGHIDEventTap, replacement);
+  CFRelease(replacement);
+  return nullptr;
+}
+
 // Quartz event tap support
 CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
 {
@@ -1717,6 +1775,16 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
   case kCGEventKeyUp:
   case kCGEventFlagsChanged:
     computer->onKey(event);
+    // This original will be consumed below while remote. Preserve its release
+    // for local mouse drivers without allowing it to return through HID.
+    if (deskflow::platform::osx::shouldSyncShiftRelease(
+            type, event, computer->m_isOnComputer, computer->m_optionsCompatibilityEnabled
+        )) {
+      if (auto release = deskflow::platform::osx::copyCompatibilityEvent(event)) {
+        CGEventPost(kCGSessionEventTap, release);
+        CFRelease(release);
+      }
+    }
     break;
   case kCGEventTapDisabledByTimeout:
     // Re-enable our event-tap if we still have accessibility permissions
@@ -1742,8 +1810,9 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
 
     const auto deltaX = static_cast<double>(nativeEvent.deltaX);
     const auto deltaY = static_cast<double>(nativeEvent.deltaY);
-    const auto direction =
-        classifyNavigationGesture(type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX, deltaY);
+    const auto direction = classifyNavigationGesture(
+        type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX, deltaY
+    );
     const auto action = navigationActionSlotForDirection(
         direction, computer->m_navigationGestureAction1, computer->m_navigationGestureAction2
     );
@@ -1816,9 +1885,8 @@ void OSXComputer::navigationDirectionsFromOptions(
   }
 }
 
-NavigationGestureDirection OSXComputer::classifyNavigationGesture(
-    CGEventType type, bool isOnComputer, bool enabled, double deltaX, double deltaY
-)
+NavigationGestureDirection
+OSXComputer::classifyNavigationGesture(CGEventType type, bool isOnComputer, bool enabled, double deltaX, double deltaY)
 {
   if (type != kNavigationGestureEventType || isOnComputer || !enabled) {
     return NavigationGestureDirection::None;

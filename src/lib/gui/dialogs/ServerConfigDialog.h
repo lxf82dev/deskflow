@@ -68,6 +68,7 @@ protected:
   void setHeartbeat(int rate);
 
   void toggleRelativeMouseMoves(bool enabled);
+  void toggleMacOptionsCompatibility(bool enabled);
   void toggleMacNavigationGestures(bool enabled);
   void setMacNavigationGestureAction1(int index);
   void setMacNavigationGestureAction2(int index);
@@ -92,6 +93,7 @@ protected:
   }
 
 private:
+  friend class ServerConfigDialogTests;
   void save();
   void cancel();
   void loadFromConfig();
@@ -117,6 +119,7 @@ private:
   int m_switchDoubleTap;
   uint m_clipboardSize;
   bool m_relativeMouseMoves;
+  bool m_macOptionsCompatibilityEnabled = false;
   bool m_macNavigationGesturesEnabled;
   NavigationGestureDirection m_macNavigationGestureAction1 = NavigationGestureDirection::Left;
   NavigationGestureDirection m_macNavigationGestureAction2 = NavigationGestureDirection::Right;

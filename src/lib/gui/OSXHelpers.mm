@@ -167,25 +167,27 @@ NavigationGestureDirection recordMacNavigationGesture(QWidget *parent, const QSt
   dialog.setWindowTitle(QObject::tr("Detect navigation gesture"));
   dialog.setText(QObject::tr("Press the Options+ action to use for %1.").arg(actionName));
   dialog.setInformativeText(
-      QObject::tr("Deskflow can detect horizontal or vertical macOS swipe events. Cancel if this action produces a "
-                  "standard key, mouse event, or an unsupported system action.")
+      QObject::tr(
+          "Deskflow can detect horizontal or vertical macOS swipe events. Cancel if this action produces a "
+          "standard key, mouse event, or an unsupported system action."
+      )
   );
   dialog.setStandardButtons(QMessageBox::Cancel);
 
   __block NavigationGestureDirection direction = NavigationGestureDirection::None;
   QMessageBox *dialogPtr = &dialog;
-  id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskSwipe
-                                                     handler:^NSEvent *(NSEvent *event) {
-                                                       direction = navigationGestureDirectionFromDeltas(
-                                                           static_cast<double>(event.deltaX),
-                                                           static_cast<double>(event.deltaY)
-                                                       );
-                                                       if (direction != NavigationGestureDirection::None) {
-                                                         dialogPtr->accept();
-                                                         return nil;
-                                                       }
-                                                       return event;
-                                                     }];
+  id monitor =
+      [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskSwipe
+                                            handler:^NSEvent *(NSEvent *event) {
+                                              direction = navigationGestureDirectionFromDeltas(
+                                                  static_cast<double>(event.deltaX), static_cast<double>(event.deltaY)
+                                              );
+                                              if (direction != NavigationGestureDirection::None) {
+                                                dialogPtr->accept();
+                                                return nil;
+                                              }
+                                              return event;
+                                            }];
 
   dialog.exec();
   if (monitor != nil) {
