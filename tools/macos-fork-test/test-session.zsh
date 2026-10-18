@@ -13,6 +13,7 @@ domain="gui/$(id -u)"
 package_dir="${0:A:h}"
 
 fail() { print -u2 -- "$*"; exit 1; }
+(( EUID != 0 )) || fail 'Run this test command as your desktop user, without sudo.'
 stop_deskflow() {
   /usr/bin/pkill -TERM -u "$(id -u)" -x Deskflow 2>/dev/null || true
   /usr/bin/pkill -TERM -u "$(id -u)" -x deskflow-core 2>/dev/null || true

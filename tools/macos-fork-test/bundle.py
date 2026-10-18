@@ -65,6 +65,11 @@ info = {
 }
 with (contents / "Info.plist").open("wb") as stream:
     plistlib.dump(info, stream)
+# Homebrew splits QtSvg from QtBase. macdeployqt resolves plugin @rpath loads
+# using the app's search paths, beyond its separate -libpath lookup. These
+# temporary source paths are removed by the audit below before signing.
+for path in args.libpath:
+    subprocess.run(["install_name_tool", "-add_rpath", str(path.resolve()), str(macos / "Deskflow")], check=True)
 subprocess.run([
     str(args.macdeployqt), str(app), "-always-overwrite", "-no-codesign",
     "-executable=" + str(macos / "deskflow-core"),
