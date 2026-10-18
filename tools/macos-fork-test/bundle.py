@@ -65,15 +65,25 @@ info = {
 }
 with (contents / "Info.plist").open("wb") as stream:
     plistlib.dump(info, stream)
-# Homebrew splits QtSvg from QtBase. macdeployqt resolves plugin @rpath loads
-# using the app's search paths, beyond its separate -libpath lookup. These
-# temporary source paths are removed by the audit below before signing.
+# Homebrew splits QtSvg from QtBase. Seed complete runtime-only frameworks
+# explicitly; Qt's deployment tool cannot always resolve these plugin loads.
+extra_images = []
 for path in args.libpath:
-    for name in ("Deskflow", "deskflow-core"):
-        subprocess.run(["install_name_tool", "-add_rpath", str(path.resolve()), str(macos / name)], check=True)
+    for framework in sorted(path.glob("Qt*.framework")):
+        destination = contents / "Frameworks" / framework.name
+        version = destination / "Versions/A"
+        version.mkdir(parents=True)
+        image = version / framework.stem
+        shutil.copy2(framework / "Versions/Current" / framework.stem, image)
+        shutil.copytree(framework / "Resources", version / "Resources")
+        (destination / "Versions/Current").symlink_to("A", target_is_directory=True)
+        (destination / framework.stem).symlink_to("Versions/Current/" + framework.stem)
+        (destination / "Resources").symlink_to("Versions/Current/Resources", target_is_directory=True)
+        extra_images.append(image)
 subprocess.run([
     str(args.macdeployqt), str(app), "-always-overwrite", "-no-codesign",
     "-executable=" + str(macos / "deskflow-core"),
+    *("-executable=" + str(path) for path in extra_images),
     *("-libpath=" + str(path) for path in args.libpath),
 ], check=True)
 # Audit all Mach-O images, including plugins, before signing. No Homebrew paths
@@ -97,7 +107,18 @@ for path in contents.rglob("*"):
         if dependency in identities:
             continue
         if dependency.startswith("/") and not dependency.startswith(("/System/Library/", "/usr/lib/")):
-            raise SystemExit(f"Unbundled dependency in {path}: {dependency}")
+            if ".framework/" in dependency:
+                prefix, suffix = dependency.split(".framework/", 1)
+                relative = prefix.rsplit("/", 1)[-1] + ".framework/" + suffix
+            else:
+                relative = Path(dependency).name
+            # Rebase only to an image already included in this bundle, never
+            # to a file that might happen to exist on the developer's machine.
+            if not (contents / "Frameworks" / relative).is_file():
+                raise SystemExit(f"Unbundled dependency in {path}: {dependency}")
+            replacement = "@rpath/" + relative
+            subprocess.run(["install_name_tool", "-change", dependency, replacement, str(path)], check=True)
+            dependency = replacement
         if dependency.startswith("@rpath/"):
             target = contents / "Frameworks" / dependency.removeprefix("@rpath/")
         elif dependency.startswith("@loader_path/"):
