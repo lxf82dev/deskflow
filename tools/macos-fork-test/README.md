@@ -84,6 +84,20 @@ To remove only the new login arrangement, preserving the current running app and
 
 The installer has simulated install/reinstall/undo/restore tests with fake process and launchd commands. A real logout/reboot is a separate final check. The updated Restore Previous Setup command also undoes a permanent login arrangement before restoring the original app.
 
+## Retire the helper apps and rename the installed app
+
+After the permanent login setup works on both Macs, run this on each Mac as the desktop user, without sudo:
+
+```sh
+/bin/zsh permanent-login.zsh cleanup
+```
+
+It renames the installed app to `~/Applications/Deskflow+.app`, updates its display name and login entry, and archives the retired MX Relay and Smooth Mode menu apps plus their user login agents under the private `DeskflowForkTest/retired-helpers/` directory. The compiled input code, bundle identifier, settings, certificates and original `/Applications/Deskflow.app` are retained. The privileged AWDL worker stays installed because Deskflow+ still uses it for smoothing.
+
+Changing the bundle's display name requires a new local signature. If Deskflow+ exits immediately or macOS requests access again, remove its stale entry under Privacy & Security → Accessibility (Device Control and Data Access on newer macOS), add `~/Applications/Deskflow+.app`, and enable it. Reopen Deskflow+ afterward. Keep another way to control the client during this step. Once connected, switch to the client and back once, then check scrolling, navigation, Mission Control and Smooth Mode status.
+
+The cleanup can be repeated without signing the renamed app again. The full `permanent-login.zsh restore` command above also recovers the archived helper apps and startup files. The private recovery directory keeps its historical `DeskflowForkTest` name so existing recovery commands continue to work.
+
 ## Reproduce the package
 
 Build an arm64 Release tree with `BUILD_OSX_BUNDLE=OFF`, `BUILD_TESTS=OFF`, deployment target 27.0 and the documented Qt/OpenSSL dependencies. Commit source changes first. Then:

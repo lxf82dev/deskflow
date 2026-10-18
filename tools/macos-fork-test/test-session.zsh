@@ -26,6 +26,7 @@ stop_deskflow() {
 }
 
 if [[ "${1:-}" == start ]]; then
+  [[ ! -d "$HOME/Applications/Deskflow+.app" ]] || fail 'Deskflow+ is already installed. Reopen it or use the private permanent-login.zsh restore command before starting a new test.'
   [[ "$(uname -m)" == arm64 ]] || fail 'This package is for Apple Silicon.'
   os_version="$(sw_vers -productVersion)"
   (( ${os_version%%.*} >= 27 )) || fail 'This test package requires macOS 27 or newer.'
@@ -66,6 +67,9 @@ if [[ "${1:-}" == start ]]; then
   print -- 'The old helper login entries are only unloaded for this login session. Do not log out during the first test.'
   print -r -- "Rollback: /bin/zsh '$package_dir/Restore Previous Setup.command'"
 elif [[ "${1:-}" == restore ]]; then
+  if [[ -f "$session_dir/cleanup-backup/completed" && -f "$session_dir/permanent-login.zsh" ]]; then
+    exec /bin/zsh "$session_dir/permanent-login.zsh" restore
+  fi
   [[ -f "$session_dir/active" ]] || fail 'No active fork test backup was found.'
   backup="$(<"$session_dir/active")"
   [[ "$backup" == "$session_dir"/backup-* && -d "$backup/Deskflow" ]] || fail 'The test backup is missing or invalid.'

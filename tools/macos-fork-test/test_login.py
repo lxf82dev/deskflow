@@ -38,7 +38,7 @@ elif name in ('pkill','pgrep'): result=1
 ledger.write_text(json.dumps(data)); sys.exit(result)
 '''
 
-for case in ('roundtrip', 'disabled-before', 'autostart-off'):
+for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip'):
     with tempfile.TemporaryDirectory(prefix='deskflow-login-test-') as directory:
         root = Path(directory)
         home = root/'user'
@@ -59,10 +59,15 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off'):
         (app/'MacOS').mkdir(parents=True)
         (app/'MacOS/Deskflow').write_text('unchanged app')
         with (app/'Info.plist').open('wb') as stream:
-            plistlib.dump({'CFBundleIdentifier':'dev.lxf82.deskflow.forktest'},stream)
+            plistlib.dump({'CFBundleIdentifier':'dev.lxf82.deskflow.forktest','CFBundleName':'Deskflow Fork Test','CFBundleDisplayName':'Deskflow Fork Test'},stream)
         agents = home/'Library/LaunchAgents'; agents.mkdir(parents=True)
         for label in legacy:
             with (agents/(label+'.plist')).open('wb') as stream: plistlib.dump({'Label':label},stream)
+        if case=='cleanup-roundtrip':
+            for title,identifier in [('Deskflow MX Relay','local.deskflow.mx-middle-relay'),('Deskflow Smooth Mode','local.deskflow.mx-smooth-mode')]:
+                helper=home/'Applications'/(title+'.app')/'Contents'
+                helper.mkdir(parents=True)
+                with (helper/'Info.plist').open('wb') as stream: plistlib.dump({'CFBundleIdentifier':identifier},stream)
         ledger = root/'ledger.json'
         ledger.write_text(json.dumps({'calls':[], 'loaded':[], 'disabled':{legacy[0]:False,legacy[1]:case=='disabled-before'}}))
         for name in ('launchctl','codesign','open','pkill','pgrep'):
@@ -91,6 +96,29 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off'):
             assert fork in installed['loaded']
             assert (app/'MacOS/Deskflow').read_text()=='unchanged app'
             run('install')
+            if case=='cleanup-roundtrip':
+                cleaned=run('cleanup')
+                renamed=home/'Applications/Deskflow+.app'
+                assert renamed.is_dir() and not app.parent.exists()
+                with (renamed/'Contents/Info.plist').open('rb') as stream:
+                    info=plistlib.load(stream)
+                assert info['CFBundleName']=='Deskflow+' and info['CFBundleDisplayName']=='Deskflow+'
+                assert (renamed/'Contents/MacOS/Deskflow').read_text()=='unchanged app'
+                for title in ['Deskflow MX Relay','Deskflow Smooth Mode']:
+                    assert not (home/'Applications'/(title+'.app')).exists()
+                    assert (state/'retired-helpers/apps'/(title+'.app')).is_dir()
+                assert all(not (agents/(label+'.plist')).exists() for label in legacy)
+                with (agents/(fork+'.plist')).open('rb') as stream:
+                    assert plistlib.load(stream)['ProgramArguments'][-1]==str(renamed)
+                first_calls=len(cleaned['calls'])
+                repeated=run('cleanup')
+                assert not any(call[0]=='codesign' and '--force' in call for call in repeated['calls'][first_calls:])
+                recovered=run('restore')
+                assert all((agents/(label+'.plist')).is_file() for label in legacy)
+                assert all((home/'Applications'/(title+'.app')).is_dir() for title in ['Deskflow MX Relay','Deskflow Smooth Mode'])
+                assert (prefs/'Deskflow.conf').read_text()=='original settings\n'
+                print('PASS:',case)
+                continue
             undone=run('undo')
             assert not (agents/(fork+'.plist')).exists()
             assert undone['disabled'][legacy[0]] is False
