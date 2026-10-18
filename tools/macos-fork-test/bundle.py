@@ -6,6 +6,7 @@
 
 import argparse
 import plistlib
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,7 @@ parser.add_argument("build", type=Path)
 parser.add_argument("output", type=Path, help="New output folder; never overwrites")
 parser.add_argument("--macdeployqt", required=True, type=Path)
 parser.add_argument("--lrelease", required=True, type=Path)
+parser.add_argument("--libpath", action="append", default=[], type=Path, help="Extra Qt module library path")
 args = parser.parse_args()
 source = Path(__file__).resolve().parents[2]
 build = args.build.resolve()
@@ -66,6 +68,7 @@ with (contents / "Info.plist").open("wb") as stream:
 subprocess.run([
     str(args.macdeployqt), str(app), "-always-overwrite", "-no-codesign",
     "-executable=" + str(macos / "deskflow-core"),
+    *("-libpath=" + str(path) for path in args.libpath),
 ], check=True)
 # Audit all Mach-O images, including plugins, before signing. No Homebrew paths
 # are allowed as runtime dependencies; copied libraries must remain relocatable.
@@ -75,11 +78,30 @@ for path in contents.rglob("*"):
     kind = subprocess.check_output(["file", "-b", str(path)], text=True)
     if "Mach-O" not in kind:
         continue
+    # A dylib's own LC_ID_DYLIB is listed by `otool -L` too, but is not a load
+    # dependency. macdeployqt can retain its original absolute identity.
+    identities = subprocess.check_output(["otool", "-D", str(path)], text=True).splitlines()[1:]
+    commands = subprocess.check_output(["otool", "-l", str(path)], text=True)
+    for rpath in re.findall(r"cmd LC_RPATH\n\s*cmdsize \d+\n\s*path (.*?) \(offset", commands):
+        if rpath.startswith("/") and not rpath.startswith(("/System/Library/", "/usr/lib/")):
+            subprocess.run(["install_name_tool", "-delete_rpath", rpath, str(path)], check=True)
     links = subprocess.check_output(["otool", "-L", str(path)], text=True).splitlines()[1:]
     for line in links:
         dependency = line.strip().split(" (", 1)[0]
+        if dependency in identities:
+            continue
         if dependency.startswith("/") and not dependency.startswith(("/System/Library/", "/usr/lib/")):
             raise SystemExit(f"Unbundled dependency in {path}: {dependency}")
+        if dependency.startswith("@rpath/"):
+            target = contents / "Frameworks" / dependency.removeprefix("@rpath/")
+        elif dependency.startswith("@loader_path/"):
+            target = path.parent / dependency.removeprefix("@loader_path/")
+        elif dependency.startswith("@executable_path/"):
+            target = macos / dependency.removeprefix("@executable_path/")
+        else:
+            continue
+        if not target.is_file():
+            raise SystemExit(f"Missing bundled dependency in {path}: {dependency}")
 subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)], check=True)
 subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
 for name in ("Start Fork Test.command", "Restore Previous Setup.command", "test-session.zsh", "README.md"):

@@ -65,7 +65,8 @@ Build an arm64 Release tree with `BUILD_OSX_BUNDLE=OFF`, `BUILD_TESTS=OFF`, depl
 ```sh
 python3 tools/macos-fork-test/bundle.py build/portable dist/fork-test \
   --macdeployqt /opt/homebrew/opt/qtbase/bin/macdeployqt \
-  --lrelease /opt/homebrew/opt/qttools/bin/lrelease
+  --lrelease /opt/homebrew/opt/qttools/bin/lrelease \
+  --libpath /opt/homebrew/opt/qtsvg/lib
 ```
 
 The script bundles runtime libraries/plugins, records the source revision, rejects remaining absolute dependencies outside macOS system libraries, and ad-hoc signs/verifies the final app. Qt's own optional translation catalogs are not included; unmatched Qt strings fall back to English. Deskflow's existing translation catalogs are included.
