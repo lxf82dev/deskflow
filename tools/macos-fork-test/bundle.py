@@ -69,7 +69,8 @@ with (contents / "Info.plist").open("wb") as stream:
 # using the app's search paths, beyond its separate -libpath lookup. These
 # temporary source paths are removed by the audit below before signing.
 for path in args.libpath:
-    subprocess.run(["install_name_tool", "-add_rpath", str(path.resolve()), str(macos / "Deskflow")], check=True)
+    for name in ("Deskflow", "deskflow-core"):
+        subprocess.run(["install_name_tool", "-add_rpath", str(path.resolve()), str(macos / name)], check=True)
 subprocess.run([
     str(args.macdeployqt), str(app), "-always-overwrite", "-no-codesign",
     "-executable=" + str(macos / "deskflow-core"),
