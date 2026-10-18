@@ -47,12 +47,16 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip
         state.mkdir(parents=True)
         backup = state/'backup-original'; backup.mkdir()
         prefs = home/'Library/Deskflow'; prefs.mkdir(parents=True)
-        (prefs/'Deskflow.conf').write_text('[gui]\nstartCoreWithGui='+('false' if case=='autostart-off' else 'true')+'\n')
+        (prefs/'Deskflow.conf').write_text('[gui]\nstartCoreWithGui='+('false' if case=='autostart-off' else 'true')+'\n[core]\nprocessMode=1\n')
         (backup/'Deskflow').mkdir()
         (backup/'Deskflow/Deskflow.conf').write_text('original settings\n')
         (backup/'control').write_text('auto\n')
         (backup/'loaded-agents').write_text('\n'.join(legacy)+'\n')
         (state/'active').write_text(str(backup)+'\n')
+        original=root/'system/Applications/Deskflow.app'
+        (original/'Contents').mkdir(parents=True)
+        with (original/'Contents/Info.plist').open('wb') as stream:
+            plistlib.dump({'CFBundleIdentifier':'org.deskflow.deskflow'},stream)
         control = home/'Library/Application Support/DeskflowMXAWDL/control'
         control.parent.mkdir(parents=True); control.write_text('auto\n')
         app = home/'Applications/Deskflow Fork Test.app/Contents'
@@ -75,8 +79,9 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip
         # Rewrite only the generated test copy: no production test-mode switch,
         # no HOME override, and no real process/service commands can run.
         transformed = source.replace('$HOME', '${DESKFLOW_LOGIN_TEST_HOME}')
-        for original in ('/bin/launchctl','/usr/bin/codesign','/usr/bin/open','/usr/bin/pkill','/usr/bin/pgrep'):
-            transformed=transformed.replace(original,'"$DESKFLOW_LOGIN_TEST_BIN/'+Path(original).name+'"')
+        transformed = transformed.replace('/Applications/Deskflow.app', str(original))
+        for command_path in ('/bin/launchctl','/usr/bin/codesign','/usr/bin/open','/usr/bin/pkill','/usr/bin/pgrep'):
+            transformed=transformed.replace(command_path,'"$DESKFLOW_LOGIN_TEST_BIN/'+Path(command_path).name+'"')
         script=root/'test-login.zsh'; script.write_text(transformed)
         env=dict(os.environ,DESKFLOW_LOGIN_TEST_HOME=str(home),DESKFLOW_LOGIN_TEST_BIN=str(bins),DESKFLOW_LOGIN_TEST_LEDGER=str(ledger))
         def run(action, success=True):
@@ -110,10 +115,27 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip
                 assert all(not (agents/(label+'.plist')).exists() for label in legacy)
                 with (agents/(fork+'.plist')).open('rb') as stream:
                     assert plistlib.load(stream)['ProgramArguments'][-1]==str(renamed)
-                first_calls=len(cleaned['calls'])
+                run('status')
+                disabled=json.loads(ledger.read_text()); disabled['disabled'][fork]=True
+                ledger.write_text(json.dumps(disabled)); run('retire-original',False)
+                assert original.is_dir()
+                disabled=json.loads(ledger.read_text()); disabled['disabled'][fork]=False
+                ledger.write_text(json.dumps(disabled))
+                with (original/'Contents/Info.plist').open('wb') as stream:
+                    plistlib.dump({'CFBundleIdentifier':'unrelated.app'},stream)
+                run('retire-original',False)
+                assert original.is_dir()
+                with (original/'Contents/Info.plist').open('wb') as stream:
+                    plistlib.dump({'CFBundleIdentifier':'org.deskflow.deskflow'},stream)
+                run('retire-original')
+                archived=state/'retired-original/Deskflow.app'
+                assert archived.is_dir() and not original.exists()
+                run('retire-original')
+                first_calls=len(json.loads(ledger.read_text())['calls'])
                 repeated=run('cleanup')
                 assert not any(call[0]=='codesign' and '--force' in call for call in repeated['calls'][first_calls:])
                 recovered=run('restore')
+                assert any(call==['open',str(archived)] for call in recovered['calls'])
                 assert all((agents/(label+'.plist')).is_file() for label in legacy)
                 assert all((home/'Applications'/(title+'.app')).is_dir() for title in ['Deskflow MX Relay','Deskflow Smooth Mode'])
                 assert (prefs/'Deskflow.conf').read_text()=='original settings\n'
@@ -129,6 +151,6 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip
                 assert not (state/'active').exists()
                 assert (prefs/'Deskflow.conf').read_text()=='original settings\n'
                 assert all(label in restored['loaded'] for label in legacy)
-                assert any(call==['open','/Applications/Deskflow.app'] for call in restored['calls'])
+                assert any(call==['open',str(original)] for call in restored['calls'])
         print('PASS:',case)
 print('No real services, processes, app bundles or user settings were changed.')

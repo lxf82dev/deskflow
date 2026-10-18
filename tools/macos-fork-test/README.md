@@ -98,6 +98,24 @@ Changing the bundle's display name requires a new local signature. If Deskflow+ 
 
 The cleanup can be repeated without signing the renamed app again. The full `permanent-login.zsh restore` command above also recovers the archived helper apps and startup files. The private recovery directory keeps its historical `DeskflowForkTest` name so existing recovery commands continue to work.
 
+## Remove the original app and check login startup
+
+Once Deskflow+ works on both Macs, run on each Mac as the desktop user:
+
+```sh
+/bin/zsh permanent-login.zsh retire-original
+```
+
+This first verifies the Deskflow+ signature, login target, RunAtLoad flag, loaded/enabled LaunchAgent, desktop process mode and input-sharing autostart preference. It then moves only `/Applications/Deskflow.app` (expected identifier `org.deskflow.deskflow`) into the private `DeskflowForkTest/retired-original/` archive. It refuses to overwrite an existing backup or move an unrelated/running original app. Deskflow+ keeps running. The shared settings, certificates and AWDL worker are retained.
+
+For a read-only startup check later:
+
+```sh
+/bin/zsh "$HOME/Library/Application Support/DeskflowForkTest/permanent-login.zsh" status
+```
+
+The LaunchAgent starts the app at user login even if it is absent from the Open at Login list in System Settings. Its `/usr/bin/open` process normally exits successfully after launching the GUI; a job state of `not running` is expected for that wrapper. A real logout/reboot is still needed to verify startup end to end. Full recovery opens the archived original app if it has been removed from Applications.
+
 ## Reproduce the package
 
 Build an arm64 Release tree with `BUILD_OSX_BUNDLE=OFF`, `BUILD_TESTS=OFF`, deployment target 27.0 and the documented Qt/OpenSSL dependencies. Commit source changes first. Then:

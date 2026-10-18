@@ -15,6 +15,25 @@ target="$domain/local.deskflow.fork-login"
 fail() { print -u2 -- "$*"; exit 1; }
 (( EUID != 0 )) || fail 'Run as your desktop user, without sudo.'
 
+check_login() {
+  [[ "$app" == "$HOME/Applications/Deskflow+.app" && -f "$app/Contents/MacOS/Deskflow" ]] || fail 'Deskflow+ is missing. Finish the renamed app cleanup first.'
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")" == dev.lxf82.deskflow.forktest ]] || fail 'Unexpected Deskflow+ app identifier.'
+  /usr/bin/codesign --verify --deep --strict "$app"
+  [[ -f "$login_state/installed" && -f "$agent" ]] || fail 'The permanent login entry is missing. Run this script with install first.'
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print Label' "$agent")" == local.deskflow.fork-login &&
+     "$(/usr/libexec/PlistBuddy -c 'Print ProgramArguments:0' "$agent")" == /usr/bin/open &&
+     "$(/usr/libexec/PlistBuddy -c 'Print ProgramArguments:1' "$agent")" == -g &&
+     "$(/usr/libexec/PlistBuddy -c 'Print ProgramArguments:2' "$agent")" == "$app" &&
+     "$(/usr/libexec/PlistBuddy -c 'Print RunAtLoad' "$agent")" == true &&
+     "$(/usr/libexec/PlistBuddy -c 'Print LimitLoadToSessionType' "$agent")" == Aqua ]] || fail 'The login entry does not match the expected Deskflow+ configuration.'
+  /bin/launchctl print "$target" >/dev/null 2>&1 || fail 'The Deskflow+ login entry is not loaded. Run this script with install first.'
+  /bin/launchctl print-disabled "$domain" | /usr/bin/awk '$1=="\"local.deskflow.fork-login\"" && $2=="=>" && ($3=="disabled" || $3=="true") {exit 1}' || fail 'The Deskflow+ login entry is disabled. Run this script with install first.'
+  /usr/bin/awk '/^\[gui\]/{s=1;next} /^\[/{s=0} s && /^startCoreWithGui=true$/{found=1} END{exit !found}' "$HOME/Library/Deskflow/Deskflow.conf" || fail 'Deskflow input sharing is not configured to start with its GUI.'
+  /usr/bin/awk '/^\[core\]/{s=1;next} /^\[/{s=0} s && /^processMode=1$/{found=1} END{exit !found}' "$HOME/Library/Deskflow/Deskflow.conf" || fail 'Deskflow is not configured for desktop process mode.'
+  print -- "LOGIN OK: Deskflow+ is enabled at login for $(id -un); input sharing starts with it."
+  print -- 'This checks the saved configuration and loaded login job; a real logout/reboot remains the final startup test.'
+}
+
 restore_retired_helpers() {
   for name in 'Deskflow MX Relay' 'Deskflow Smooth Mode'; do
     archived="$session_dir/retired-helpers/apps/$name.app"
@@ -189,6 +208,33 @@ elif [[ "${1:-}" == cleanup ]]; then
   : > "$session_dir/cleanup-backup/completed"
   print -- 'Cleanup complete: Deskflow+.app is the working app; retired helper apps and startup files are archived privately.'
   print -- 'The AWDL worker and current Deskflow settings were retained. If macOS requests it after the display-name/signature change, re-enable Deskflow+ in Accessibility.'
+elif [[ "${1:-}" == status ]]; then
+  check_login
+elif [[ "${1:-}" == retire-original ]]; then
+  check_login
+  original=/Applications/Deskflow.app
+  archived="$session_dir/retired-original/Deskflow.app"
+  if [[ -e "$original" ]]; then
+    [[ ! -L "$original" && -d "$original" ]] || fail 'The original app path is unexpected; nothing has been moved.'
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$original/Contents/Info.plist")" == org.deskflow.deskflow ]] || fail 'The original app path contains a different app; nothing has been moved.'
+    [[ ! -e "$archived" ]] || fail 'An original-app archive already exists; refusing overwrite.'
+    if /usr/bin/pgrep -f '^/Applications/Deskflow[.]app/Contents/MacOS/(Deskflow|deskflow-core)( |$)' >/dev/null; then
+      fail 'The original Deskflow is still running. Quit only that app, keeping Deskflow+ open, then retry.'
+    fi
+    /bin/mkdir -p "$session_dir/retired-original"
+    # Keep recovery aware of the archived original before changing its location.
+    if [[ "${0:A}" != "$session_dir/permanent-login.zsh" ]]; then
+      /bin/cp "${0:A}" "$session_dir/permanent-login.zsh"
+      /bin/chmod 700 "$session_dir/permanent-login.zsh"
+    fi
+    /bin/mv "$original" "$archived" || fail 'macOS denied moving the original app. Move /Applications/Deskflow.app to Trash in Finder, then rerun status. Deskflow+ was not stopped.'
+    print -- 'Original Deskflow removed from Applications and archived privately for recovery.'
+  elif [[ -d "$archived" ]]; then
+    print -- 'Original Deskflow is already archived; no change needed.'
+  else
+    print -- 'Original Deskflow is absent from Applications; no change needed.'
+  fi
+  print -- 'Deskflow+, its login entry, shared settings and the privileged AWDL worker were retained.'
 elif [[ "${1:-}" == undo ]]; then
   undo_login
   print -- 'Fork login removed and prior helper enable/disable settings restored. Running apps were not stopped.'
@@ -196,6 +242,11 @@ elif [[ "${1:-}" == restore ]]; then
   [[ -f "$session_dir/active" ]] || fail 'No original setup backup was found.'
   backup="$(<"$session_dir/active")"
   [[ "$backup" == "$session_dir"/backup-* && -d "$backup/Deskflow" ]] || fail 'The original setup backup is missing or invalid.'
+  original=/Applications/Deskflow.app
+  if [[ ! -d "$original" ]]; then
+    original="$session_dir/retired-original/Deskflow.app"
+    [[ -d "$original" && "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$original/Contents/Info.plist")" == org.deskflow.deskflow ]] || fail 'The original app is missing; reinstall official Deskflow before restoring. The working fork has not been stopped.'
+  fi
   restore_retired_helpers
   if [[ -f "$login_state/installed" ]]; then undo_login; fi
   stop_user_deskflow
@@ -211,9 +262,9 @@ elif [[ "${1:-}" == restore ]]; then
         ;;
     esac
   done < "$backup/loaded-agents"
-  /usr/bin/open /Applications/Deskflow.app
+  /usr/bin/open "$original"
   /bin/rm "$session_dir/active"
   print -- 'Original Deskflow, its settings and the previously running helpers restored. Private backups retained.'
 else
-  fail 'Usage: permanent-login.zsh install|cleanup|undo|restore'
+  fail 'Usage: permanent-login.zsh install|cleanup|status|retire-original|undo|restore'
 fi
