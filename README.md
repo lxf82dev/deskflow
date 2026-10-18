@@ -9,6 +9,6 @@ This personal fork tracks [official Deskflow](https://github.com/deskflow/deskfl
 
 See [setup, build instructions and validation](docs/macos-input-fixes.md). The AWDL component is documented separately in [tools/macos-smooth-mode](tools/macos-smooth-mode/README.md).
 
-The native changes have been built and tested locally. Testing the modified Deskflow on both physical Macs remains a deployment step. The original standalone helpers were validated on that setup; they should be stopped before testing the corresponding native input features.
+The native changes have been built and tested locally. The owner also reports successful live input and switching tests on the two Apple Silicon Macs with a Keychron keyboard and MX Master 3-family mouse. The old input relay and DF menu were unloaded during the test. See the setup guide for test limits and rollback; logout/reboot validation is a separate step.
 
 For the upstream project's downloads and general documentation, see the [original README](.github/README.md). This fork is independent of Deskflow's maintainers and Logitech.

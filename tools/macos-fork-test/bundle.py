@@ -131,7 +131,7 @@ for path in contents.rglob("*"):
             raise SystemExit(f"Missing bundled dependency in {path}: {dependency}")
 subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)], check=True)
 subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
-for name in ("Start Fork Test.command", "Restore Previous Setup.command", "test-session.zsh", "README.md"):
+for name in ("Start Fork Test.command", "Restore Previous Setup.command", "test-session.zsh", "permanent-login.zsh", "README.md"):
     shutil.copy2(Path(__file__).parent / name, output / name)
     if name != "README.md":
         (output / name).chmod(0o755)

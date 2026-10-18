@@ -60,6 +60,30 @@ This stops the fork, saves the post-test settings alongside the backup, restores
 
 The snapshots include TLS material. Keep the backup folder private and do not upload it with diagnostic logs.
 
+## Make the tested fork permanent
+
+After the two-Mac checks pass, run this on each Mac as the desktop user, without sudo:
+
+```sh
+/bin/zsh permanent-login.zsh install
+```
+
+It keeps the exact tested app and its input permissions, adds `local.deskflow.fork-login` as a user login agent, and persistently disables the installed old relay/DF menu login agents. The AWDL root worker remains installed. The original app and private test backup are retained. If the original Deskflow is listed under System Settings → General → Login Items → Open at Login, remove only that original app entry so it cannot race the fork at login.
+
+The script keeps a private recovery copy. To restore the original setup later:
+
+```sh
+/bin/zsh "$HOME/Library/Application Support/DeskflowForkTest/permanent-login.zsh" restore
+```
+
+To remove only the new login arrangement, preserving the current running app and settings:
+
+```sh
+/bin/zsh "$HOME/Library/Application Support/DeskflowForkTest/permanent-login.zsh" undo
+```
+
+The installer has simulated install/reinstall/undo/restore tests with fake process and launchd commands. A real logout/reboot is a separate final check. The updated Restore Previous Setup command also undoes a permanent login arrangement before restoring the original app.
+
 ## Reproduce the package
 
 Build an arm64 Release tree with `BUILD_OSX_BUNDLE=OFF`, `BUILD_TESTS=OFF`, deployment target 27.0 and the documented Qt/OpenSSL dependencies. Commit source changes first. Then:

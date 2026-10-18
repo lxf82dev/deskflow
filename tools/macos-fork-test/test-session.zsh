@@ -69,6 +69,10 @@ elif [[ "${1:-}" == restore ]]; then
   [[ -f "$session_dir/active" ]] || fail 'No active fork test backup was found.'
   backup="$(<"$session_dir/active")"
   [[ "$backup" == "$session_dir"/backup-* && -d "$backup/Deskflow" ]] || fail 'The test backup is missing or invalid.'
+  if [[ -f "$session_dir/login-backup/installed" ]]; then
+    [[ -f "$package_dir/permanent-login.zsh" ]] || fail 'Use the updated recovery package containing permanent-login.zsh.'
+    /bin/zsh "$package_dir/permanent-login.zsh" undo
+  fi
   stop_deskflow
   /bin/mv "$prefs_dir" "$backup/Deskflow.after-test-$(date +%Y%m%d-%H%M%S)"
   /usr/bin/ditto "$backup/Deskflow" "$prefs_dir"
