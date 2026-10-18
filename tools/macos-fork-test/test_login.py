@@ -116,6 +116,14 @@ for case in ('roundtrip', 'disabled-before', 'autostart-off', 'cleanup-roundtrip
                 with (agents/(fork+'.plist')).open('rb') as stream:
                     assert plistlib.load(stream)['ProgramArguments'][-1]==str(renamed)
                 run('status')
+                current_prefs=(prefs/'Deskflow.conf').read_text()
+                (prefs/'Deskflow.conf').write_text(current_prefs.replace('processMode=1','processMode=0'))
+                run('retire-original',False)
+                assert original.is_dir()
+                (prefs/'Deskflow.conf').write_text(current_prefs.replace('processMode=1','processMode=unknown'))
+                run('status',False)
+                (prefs/'Deskflow.conf').write_text(current_prefs.replace('[core]\nprocessMode=1\n',''))
+                run('status')  # Missing core/processMode uses the macOS desktop default.
                 disabled=json.loads(ledger.read_text()); disabled['disabled'][fork]=True
                 ledger.write_text(json.dumps(disabled)); run('retire-original',False)
                 assert original.is_dir()

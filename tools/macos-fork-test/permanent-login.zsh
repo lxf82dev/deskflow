@@ -29,7 +29,14 @@ check_login() {
   /bin/launchctl print "$target" >/dev/null 2>&1 || fail 'The Deskflow+ login entry is not loaded. Run this script with install first.'
   /bin/launchctl print-disabled "$domain" | /usr/bin/awk '$1=="\"local.deskflow.fork-login\"" && $2=="=>" && ($3=="disabled" || $3=="true") {exit 1}' || fail 'The Deskflow+ login entry is disabled. Run this script with install first.'
   /usr/bin/awk '/^\[gui\]/{s=1;next} /^\[/{s=0} s && /^startCoreWithGui=true$/{found=1} END{exit !found}' "$HOME/Library/Deskflow/Deskflow.conf" || fail 'Deskflow input sharing is not configured to start with its GUI.'
-  /usr/bin/awk '/^\[core\]/{s=1;next} /^\[/{s=0} s && /^processMode=1$/{found=1} END{exit !found}' "$HOME/Library/Deskflow/Deskflow.conf" || fail 'Deskflow is not configured for desktop process mode.'
+  # Settings::defaultValue(Core::ProcessMode) is Desktop (1) on macOS.
+  # An absent key is valid; only an explicit service/unknown value blocks retirement.
+  saved_process_mode="$(/usr/bin/awk 'BEGIN{mode="1"} /^\[core\]/{s=1;next} /^\[/{s=0} s && /^processMode=/{mode=substr($0,13)} END{print mode}' "$HOME/Library/Deskflow/Deskflow.conf")"
+  case "$saved_process_mode" in
+    1) ;;
+    0) fail 'Deskflow explicitly has service process mode (processMode=0). No app was moved. Check Preferences before retrying.' ;;
+    *) fail "Unrecognized saved processMode=$saved_process_mode. No app was moved." ;;
+  esac
   print -- "LOGIN OK: Deskflow+ is enabled at login for $(id -un); input sharing starts with it."
   print -- 'This checks the saved configuration and loaded login job; a real logout/reboot remains the final startup test.'
 }

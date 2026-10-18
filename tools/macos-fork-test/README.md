@@ -106,7 +106,7 @@ Once Deskflow+ works on both Macs, run on each Mac as the desktop user:
 /bin/zsh permanent-login.zsh retire-original
 ```
 
-This first verifies the Deskflow+ signature, login target, RunAtLoad flag, loaded/enabled LaunchAgent, desktop process mode and input-sharing autostart preference. It then moves only `/Applications/Deskflow.app` (expected identifier `org.deskflow.deskflow`) into the private `DeskflowForkTest/retired-original/` archive. It refuses to overwrite an existing backup or move an unrelated/running original app. Deskflow+ keeps running. The shared settings, certificates and AWDL worker are retained.
+This first verifies the Deskflow+ signature, login target, RunAtLoad flag, loaded/enabled LaunchAgent, desktop process mode (including the macOS default when `processMode` is absent) and input-sharing autostart preference. It then moves only `/Applications/Deskflow.app` (expected identifier `org.deskflow.deskflow`) into the private `DeskflowForkTest/retired-original/` archive. It refuses to overwrite an existing backup or move an unrelated/running original app. Deskflow+ keeps running. The shared settings, certificates and AWDL worker are retained.
 
 For a read-only startup check later:
 
