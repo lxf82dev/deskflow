@@ -116,6 +116,8 @@ For a read-only startup check later:
 
 The LaunchAgent starts the app at user login even if it is absent from the Open at Login list in System Settings. Its `/usr/bin/open` process normally exits successfully after launching the GUI; a job state of `not running` is expected for that wrapper. A real logout/reboot is still needed to verify startup end to end. Full recovery opens the archived original app if it has been removed from Applications.
 
+For another read-only installation scan, run `audit-installation.zsh` on each Mac. It reports login configuration, matching installed apps/downloads, startup files, retired helper jobs, running processes, the retained AWDL worker, connections and private recovery archive sizes. It leaves settings and privacy grants unchanged. Source/build packages and private recovery archives are retained intentionally.
+
 ## Reproduce the package
 
 Build an arm64 Release tree with `BUILD_OSX_BUNDLE=OFF`, `BUILD_TESTS=OFF`, deployment target 27.0 and the documented Qt/OpenSSL dependencies. Commit source changes first. Then:
