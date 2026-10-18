@@ -9,6 +9,7 @@
 #include "base/Log.h"
 
 #include <QObject>
+#include <QTemporaryDir>
 
 class ServerProxyTests : public QObject
 {
@@ -20,7 +21,9 @@ private Q_SLOTS:
   void handleData_incompleteMessage_queuesDisconnectRequest();
   void parseHandshakeMessage_protocolError_queuesRefusalRequest();
   void navigationGesture_invalidSlots_areIgnored();
+  void handleHello_negotiatesSupportedVersionsAndRoutesNavigation();
 
 private:
   Log m_log;
+  QTemporaryDir m_settings;
 };

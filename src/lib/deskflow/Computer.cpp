@@ -296,8 +296,8 @@ void Computer::navigationGesture(NavigationActionSlot action)
     // as navigation. Use the same native shortcuts as the validated relay.
     const KeyID key = output == NavigationOutputAction::Back ? '[' : ']';
     const auto button = static_cast<KeyButton>(0x1f0 + static_cast<int>(action));
-    m_computer->fakeKeyDown(key, KeyModifierSuper, button, {});
-    m_computer->fakeKeyUp(button);
+    keyDown(key, KeyModifierSuper, button, {});
+    keyUp(key, KeyModifierSuper, button);
 #else
     const ButtonID button = output == NavigationOutputAction::Back ? kButtonExtra0 : kButtonExtra1;
     m_computer->fakeMouseButton(button, true);
@@ -319,9 +319,22 @@ void Computer::navigationGesture(NavigationActionSlot action)
     return;
   }
 
+#ifdef Q_OS_MACOS
+  // KeySequenceWidget stores Qt's default Mac convention: physical Command
+  // is "Control", while physical Control is "Meta". Convert only these
+  // client-local shortcuts; existing server hotkey serialization is unchanged.
+  const bool command = (mask & KeyModifierControl) != 0;
+  const bool control = (mask & KeyModifierMeta) != 0;
+  mask &= ~(KeyModifierControl | KeyModifierMeta);
+  if (command)
+    mask |= KeyModifierSuper;
+  if (control)
+    mask |= KeyModifierControl;
+#endif
+
   const auto button = static_cast<KeyButton>(0x1f0 + static_cast<int>(action));
-  m_computer->fakeKeyDown(key, mask, button, {});
-  m_computer->fakeKeyUp(button);
+  keyDown(key, mask, button, {});
+  keyUp(key, mask, button);
 }
 
 void Computer::resetOptions()

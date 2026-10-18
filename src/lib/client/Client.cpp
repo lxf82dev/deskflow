@@ -486,6 +486,7 @@ bool Client::setupComputer(int16_t protocolMinor)
     m_server = new ServerProxy1_7(this, m_stream, m_events);
     break;
   case 8:
+  case 9: // Navigation uses the shared parser; keyboard/layout messages remain 1.8.
     m_server = new ServerProxy1_8(this, m_stream, m_events);
     break;
   default:
