@@ -52,8 +52,12 @@ static int interface_up(void) {
     if (dry_run) {
         if (fake_net_path) {
             char b[32];
-            if (read_small(fake_net_path, b, sizeof(b), target_uid)) simulated_up = !strncmp(b, "up", 2);
+            if (!read_small(fake_net_path, b, sizeof(b), target_uid) || !strncmp(b, "error", 5)) {
+                last_net_error = EIO; return -1;
+            }
+            simulated_up = !strncmp(b, "up", 2);
         }
+        last_net_error = 0;
         return simulated_up;
     }
     struct ifreq r = {0};
@@ -167,6 +171,9 @@ static void write_status(const char *mode, pid_t core, int up, time_t pause_unti
     if (ok) (void)rename(temp, status_path); else (void)unlink(temp);
 }
 static int test_policy(void) {
+    Focus active = {.known = true, .client_active = true};
+    focus_line(&active, true, "[x] INFO: new client disconnected");
+    if (!active.known || !active.client_active) return 1;
     for (int role = 0; role < 2; ++role) {
         Focus f = {0};
         if (should_suppress(f, true, false, false)) return 1;
@@ -207,8 +214,13 @@ int main(int argc, char **argv) {
     if (!dry_run && net_fd < 0) return 1;
     // Restore a down state owned by a previously crashed worker before starting fresh.
     char previous[2048];
-    if (!dry_run && read_small(status_path, previous, sizeof(previous), 0) &&
-        strstr(previous, "owned_down=1\n") && strstr(previous, "restore_up=1\n") && interface_up() == 0) (void)change_interface(true);
+    if (read_small(status_path, previous, sizeof(previous), dry_run ? target_uid : 0) &&
+        strstr(previous, "owned_down=1\n") && strstr(previous, "restore_up=1\n")) {
+        // Keep the journal's ownership until restoration succeeds. A transient
+        // ioctl failure at startup must not be overwritten by an unowned status.
+        owned_down = true; restore_up = true;
+        restore_owned();
+    }
     int route_fd = dry_run ? -1 : socket(PF_ROUTE, SOCK_RAW, 0);
     if (route_fd >= 0) (void)fcntl(route_fd, F_SETFL, O_NONBLOCK);
     pid_t core = 0; time_t next_core_check = 0, next_status = 0;

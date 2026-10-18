@@ -14,6 +14,9 @@ static inline void focus_line(Focus *f, bool server_role, const char *line) {
     const char *m = strstr(line, "] INFO: ");
     if (m) {
         m += 8;
+        // A failed/aborted new handshake is unrelated to the active client.
+        // ClientProxyUnknown logs this even while another client has focus.
+        if (server_role && !strcmp(m, "new client disconnected")) return;
         if (!strcmp(m, "entering computer") || !strcmp(m, "entering screen")) {
             f->known = true; f->client_active = !server_role;
         } else if (!strcmp(m, "leaving computer") || !strcmp(m, "leaving screen")) {

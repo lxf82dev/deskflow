@@ -42,6 +42,12 @@ for role in ['server','client']:
         core.write_text('0\n');wait_for(lambda:ismode('deskflow-stopped'));assert net.read_text().strip()=='up'
         core.write_text('1\n');wait_for(lambda:ismode('waiting'))
         append(enter);wait_for(lambda:ismode('smooth'))
+        if role=='server':
+            append('new client disconnected')
+            control.write_text('disabled\n');wait_for(lambda:ismode('disabled'))
+            assert state()['focus_known']=='1' and state()['client_active']=='1'
+            control.write_text('auto\n');wait_for(lambda:ismode('smooth'))
+            assert net.read_text().strip()=='down'
         append('disconnected');wait_for(lambda:ismode('waiting'));assert net.read_text().strip()=='up'
         append(enter);wait_for(lambda:ismode('smooth'))
         # A symlinked log must fail open, not be followed by the privileged worker.
@@ -49,9 +55,21 @@ for role in ['server','client']:
         wait_for(lambda:ismode('waiting'));assert net.read_text().strip()=='up'
         log.unlink();log.write_text('');time.sleep(.15)
         append(enter);wait_for(lambda:ismode('smooth'))
+        # Recover a crashed worker's owned-down journal even if the interface
+        # is temporarily unreadable during restart. Keep ownership until retry.
+        process.kill();process.wait(timeout=3)
+        assert net.read_text().strip()=='down' and state()['owned_down']=='1'
+        net.write_text('error\n')
+        process=subprocess.Popen([str(binary),'--dry-run','--role',role,'--uid',str(os.getuid()),'--log',str(log),'--control',str(control),'--status',str(status),'--fake-net',str(net),'--fake-core',str(core)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        wait_for(lambda:ismode('error'))
+        assert state()['owned_down']=='1' and state()['restore_up']=='1'
+        net.write_text('down\n')
+        wait_for(lambda:ismode('waiting'))
+        assert net.read_text().strip()=='up' and state()['owned_down']=='0'
+        append(enter);wait_for(lambda:ismode('smooth'))
         process.terminate();process.wait(timeout=3)
         assert net.read_text().strip()=='up' and state()['mode']=='stopped'
-        print('PASS',role,': historical focus ignored; focus direction; OS re-enable suppression; host return; AirDrop pause/expiry; disable; rotation; core loss/restart; disconnect; symlink rejection; stop restoration')
+        print('PASS',role,': historical focus ignored; focus direction; OS re-enable suppression; host return; AirDrop pause/expiry; disable; rotation; core loss/restart; disconnect; unrelated handshake ignored; symlink rejection; crash journal and failed-restore retry; stop restoration')
     finally:
         if process.poll() is None:process.terminate();process.wait(timeout=3)
 print('No real network interfaces were read or changed during these simulations.')
