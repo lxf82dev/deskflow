@@ -905,10 +905,7 @@ void OSXComputer::screensaver(bool activate)
 
 void OSXComputer::resetOptions()
 {
-  m_optionsCompatibilityEnabled = false;
-  m_navigationGesturesEnabled = false;
-  m_navigationGestureAction1 = NavigationGestureDirection::Left;
-  m_navigationGestureAction2 = NavigationGestureDirection::Right;
+  m_inputOptions.store(InputOptions{});
 }
 
 void OSXComputer::setOptions(const OptionsList &options)
@@ -918,13 +915,15 @@ void OSXComputer::setOptions(const OptionsList &options)
     return;
   }
 
+  auto input = m_inputOptions.load();
   for (size_t i = 0; i < options.size(); i += 2) {
     if (options[i] == kOptionMacOptionsCompatibility)
-      m_optionsCompatibilityEnabled = options[i + 1] != 0;
+      input.compatibility = options[i + 1] != 0;
   }
-  m_navigationGesturesEnabled = navigationGesturesEnabledFromOptions(options, m_navigationGesturesEnabled);
-  navigationDirectionsFromOptions(options, m_navigationGestureAction1, m_navigationGestureAction2);
-  LOG_VERBOSE("macOS navigation gesture forwarding: %s", m_navigationGesturesEnabled ? "enabled" : "disabled");
+  input.navigation = navigationGesturesEnabledFromOptions(options, input.navigation);
+  navigationDirectionsFromOptions(options, input.first, input.second);
+  m_inputOptions.store(input);
+  LOG_VERBOSE("macOS navigation gesture forwarding: %s", input.navigation ? "enabled" : "disabled");
 }
 
 void OSXComputer::setSequenceNumber(uint32_t seqNum)
@@ -1726,11 +1725,11 @@ CGEventRef OSXComputer::handleOptionsInputEvent(CGEventTapProxy, CGEventType typ
     LOG_ERR("Options+ session tap was disabled by user input");
     return event;
   }
-  if (!computer->m_optionsCompatibilityEnabled || computer->m_isOnComputer)
+  const bool enabled = computer->m_inputOptions.load().compatibility;
+  if (!enabled || computer->m_isOnComputer)
     return event;
   if (!deskflow::platform::osx::shouldRelayMiddleClick(
-          type, event, computer->m_isOnComputer, computer->m_optionsCompatibilityEnabled,
-          deskflow::platform::osx::isOptionsAgentEvent(event)
+          type, event, computer->m_isOnComputer, enabled, deskflow::platform::osx::isOptionsAgentEvent(event)
       ))
     return event;
   auto replacement = deskflow::platform::osx::copyCompatibilityEvent(event);
@@ -1778,7 +1777,7 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
     // This original will be consumed below while remote. Preserve its release
     // for local mouse drivers without allowing it to return through HID.
     if (deskflow::platform::osx::shouldSyncShiftRelease(
-            type, event, computer->m_isOnComputer, computer->m_optionsCompatibilityEnabled
+            type, event, computer->m_isOnComputer, computer->m_inputOptions.load().compatibility
         )) {
       if (auto release = deskflow::platform::osx::copyCompatibilityEvent(event)) {
         CGEventPost(kCGSessionEventTap, release);
@@ -1799,32 +1798,33 @@ CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType ty
   case NX_NULLEVENT:
     break;
   case kNavigationGestureEventType: {
-    if (computer->m_isOnComputer || !computer->m_navigationGesturesEnabled) {
+    const auto input = computer->m_inputOptions.load();
+    if (computer->m_isOnComputer || !input.navigation) {
       break;
     }
 
-    NSEvent *nativeEvent = [NSEvent eventWithCGEvent:event];
-    if (nativeEvent == nil || nativeEvent.type != NSEventTypeSwipe) {
-      break;
-    }
+    // The event tap runs on a raw CFRunLoop thread without AppKit pools.
+    @autoreleasepool {
+      NSEvent *nativeEvent = [NSEvent eventWithCGEvent:event];
+      if (nativeEvent == nil || nativeEvent.type != NSEventTypeSwipe) {
+        break;
+      }
 
-    const auto deltaX = static_cast<double>(nativeEvent.deltaX);
-    const auto deltaY = static_cast<double>(nativeEvent.deltaY);
-    const auto direction = classifyNavigationGesture(
-        type, computer->m_isOnComputer, computer->m_navigationGesturesEnabled, deltaX, deltaY
-    );
-    const auto action = navigationActionSlotForDirection(
-        direction, computer->m_navigationGestureAction1, computer->m_navigationGestureAction2
-    );
-    if (action == NavigationActionSlot::None) {
-      break;
-    }
+      const auto deltaX = static_cast<double>(nativeEvent.deltaX);
+      const auto deltaY = static_cast<double>(nativeEvent.deltaY);
+      const auto direction =
+          classifyNavigationGesture(type, computer->m_isOnComputer, input.navigation, deltaX, deltaY);
+      const auto action = navigationActionSlotForDirection(direction, input.first, input.second);
+      if (action == NavigationActionSlot::None) {
+        break;
+      }
 
-    computer->sendEvent(EventTypes::PrimaryComputerNavigationGesture, NavigationGestureInfo::alloc(action));
-    LOG_DEBUG(
-        "forwarding macOS navigation gesture deltaX=%+.3f deltaY=%+.3f as action=%d", deltaX, deltaY,
-        static_cast<int>(action)
-    );
+      computer->sendEvent(EventTypes::PrimaryComputerNavigationGesture, NavigationGestureInfo::alloc(action));
+      LOG_DEBUG(
+          "forwarding macOS navigation gesture deltaX=%+.3f deltaY=%+.3f as action=%d", deltaX, deltaY,
+          static_cast<int>(action)
+      );
+    }
     break;
   }
   default:

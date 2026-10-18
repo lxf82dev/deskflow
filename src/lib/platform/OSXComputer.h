@@ -20,6 +20,7 @@
 #include <mach/mach_interface.h>
 #include <mach/mach_port.h>
 
+#include <atomic>
 #include <bitset>
 #include <map>
 #include <memory>
@@ -264,9 +265,17 @@ private:
 
   bool m_cursorHidden;
 
-  bool m_navigationGesturesEnabled = false;
-  NavigationGestureDirection m_navigationGestureAction1 = NavigationGestureDirection::Left;
-  NavigationGestureDirection m_navigationGestureAction2 = NavigationGestureDirection::Right;
+  struct InputOptions
+  {
+    bool compatibility = false;
+    bool navigation = false;
+    NavigationGestureDirection first = NavigationGestureDirection::Left;
+    NavigationGestureDirection second = NavigationGestureDirection::Right;
+  };
+  // Configuration runs on the core event thread; capture uses a CFRunLoop thread.
+  // Publish one consistent snapshot, including both direction mappings.
+  static_assert(std::atomic<InputOptions>::is_always_lock_free);
+  std::atomic<InputOptions> m_inputOptions;
 
   // keyboard stuff
   OSXKeyState *m_keyState;
@@ -318,7 +327,6 @@ private:
   static CGEventRef handleOptionsInputEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
 
   // Quartz input event support
-  bool m_optionsCompatibilityEnabled = false;
   CFMachPortRef m_optionsTapPort = nullptr;
   CFRunLoopSourceRef m_optionsTapRLSR = nullptr;
   CFMachPortRef m_eventTapPort;
