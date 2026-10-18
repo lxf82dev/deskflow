@@ -20,6 +20,19 @@ Input configuration is published as a lock-free atomic snapshot so the capture t
 
 This compatibility path registers no additional typed-key listener and logs no typed characters. Existing Deskflow input capture remains unchanged apart from the described routing.
 
+## Preferences controls
+
+**Preferences → macOS** brings the feature switches together:
+
+- Logi Options+ input compatibility: middle-click forwarding for Mission Control and Shift-release synchronization for scrolling.
+- Back/Forward navigation gesture forwarding.
+- Disable screen-edge switching at startup, using the existing cursor-lock setting and your configured switch hotkey.
+- Automatic Wi-Fi cursor smoothing through the installed AWDL worker.
+
+The first three apply to the server Mac and are disabled in client mode. They use the same saved settings as Configure Server → Advanced; gesture direction detection and custom client outputs remain in their existing dialogs. The macOS tab is omitted on other operating systems.
+
+Smoothing is available on both Macs when the controller is online. Preferences and the menu share the same control protocol. Save applies an explicit smoothing edit; Cancel leaves it unchanged, Reset reloads the current preference, and Restore Defaults stages smoothing off. Saving unrelated settings preserves an active AirDrop override. A timer refresh updates status without discarding a pending checkbox edit. Missing/stale controller status disables the checkbox and points to setup help; no service is installed automatically.
+
 ## Mouse and switching setup
 
 On the server, keep Options+ thumb-rest set to **Advanced click → Middle click**, including any application-specific profiles. On the Mac client, assign Mission Control to **Middle Mouse Button** in macOS settings. The native fix forwards the click; it does not alter the OS shortcut.
@@ -56,7 +69,8 @@ cmake -S . -B build -G Ninja \
   -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 cmake --build build --target Deskflow deskflow-core macos-smooth-mode \
   OSXComputerTests OSXInputCompatibilityTests KeySequenceTests SettingsTests \
-  KeyStateTests ComputerNavigationTests ClientProxyTests ServerProxyTests ServerConfigDialogTests -j 6
+  KeyStateTests ComputerNavigationTests ClientProxyTests ServerProxyTests ServerConfigDialogTests \
+  MacSmoothModeMenuTests MacPreferencesTests -j 6
 ```
 
 This development configuration produces `build/bin/Deskflow` and `build/bin/deskflow-core`, rather than installing or replacing `/Applications/Deskflow.app`. The optional helper package builds beside them. Use the upstream packaging instructions when preparing a distributable app bundle.
@@ -69,7 +83,7 @@ The subsequent integrated Smooth Mode menu adds `MacSmoothModeMenuTests`: contro
 
 ```sh
 ctest --test-dir build/src/unittests \
-  -R '^(MacSmoothModeMenuTests|OSXComputerTests|OSXInputCompatibilityTests|KeySequenceTests|SettingsTests|KeyStateTests|ComputerNavigationTests|ClientProxyTests|ServerProxyTests|ServerConfigDialogTests)$' \
+  -R '^(MacPreferencesTests|MacSmoothModeMenuTests|OSXComputerTests|OSXInputCompatibilityTests|KeySequenceTests|SettingsTests|KeyStateTests|ComputerNavigationTests|ClientProxyTests|ServerProxyTests|ServerConfigDialogTests)$' \
   --output-on-failure
 ctest --test-dir build/tools/macos-smooth-mode --output-on-failure
 ```
@@ -85,3 +99,5 @@ Unit and simulated tests do not replace live end-to-end validation of the new na
 These changes were prepared with OpenAI Codex assistance. Companion behavior was tested by the user on the physical setup; the native fork's build and automated validation are described above. No claim of upstream maintainer review or acceptance is made.
 
 The [review findings and corrections](macos-port-review.md) explain why additional regressions were added after the initial port.
+
+The macOS Preferences update expands validation to eleven selected native/GUI suites plus three simulated helper suites. The Preferences regression covers Save/reopen, shared Advanced settings, client-role gating, staged Cancel/Reset/Restore Defaults, external menu updates, AirDrop override preservation, unavailable helpers and tab layout. GUI tests use temporary settings/control files and do not change the installed worker.

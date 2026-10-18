@@ -6,6 +6,15 @@ add_subdirectory(core)
 
 if(APPLE)
   create_test(
+    NAME MacPreferencesTests
+    DEPENDS gui
+    LIBS Qt::Widgets
+    SOURCE MacPreferencesTests.cpp
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+  )
+  set_tests_properties(MacPreferencesTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  target_include_directories(MacPreferencesTests PRIVATE "${CMAKE_SOURCE_DIR}/src/lib/gui")
+  create_test(
     NAME MacSmoothModeMenuTests
     DEPENDS gui
     LIBS Qt::Widgets

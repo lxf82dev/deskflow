@@ -14,7 +14,7 @@ On each Mac, open Terminal in the extracted folder and run:
 /bin/zsh "Start Fork Test.command"
 ```
 
-Start the **client first**, then the server. The command:
+Start the **client first**, then the server. If an earlier fork test session is still active, run Restore Previous Setup.command on each Mac before starting this updated package. The command:
 
 1. Copies the signed app to `~/Applications/Deskflow Fork Test.app`, keeping `/Applications/Deskflow.app` intact.
 2. Stops only this user's desktop Deskflow processes and privately backs up `~/Library/Deskflow` and the smoothing preference under `~/Library/Application Support/DeskflowForkTest/`.
@@ -25,12 +25,14 @@ Grant **Deskflow Fork Test** Accessibility permission on each Mac when requested
 
 If a warning blocks opening this locally built copy, use macOS Privacy & Security → Open Anyway. The start command clears the quarantine attribute only on the copied test app and verifies its signature; it leaves Gatekeeper enabled.
 
-On the **server**, open Configure Server → Advanced and enable:
+On the **server**, open Preferences → macOS and enable:
 
 - **Enable Logi Options+ input compatibility**
-- **Forward macOS navigation gestures**
+- **Forward Back/Forward navigation gestures**
 
-Keep Left / Action 1 and Right / Action 2 as the initial navigation directions. Keep the existing Shift+Tab switch hotkey, lock to computer at startup, Synergy/Barrier selection and Info-level file logging. On the **client**, leave navigation outputs as Back and Forward. Keep the macOS Mission Control middle-button shortcut and Options+ thumb-rest mapping already used by the working setup.
+In Configure Server → Advanced, keep Left / Action 1 and Right / Action 2 as the initial navigation directions. Keep the existing Shift+Tab switch hotkey, lock to computer at startup, Synergy/Barrier selection and Info-level file logging. On the **client**, leave navigation outputs as Back and Forward. Keep the macOS Mission Control middle-button shortcut and Options+ thumb-rest mapping already used by the working setup.
+
+Preferences → macOS also exposes the startup screen-edge lock and automatic smoothing toggles. The server-only toggles are disabled on the client. Set automatic smoothing on both Macs; Save applies the change, while Cancel leaves it untouched. The menu and Preferences stay synchronized.
 
 After both sides connect, switch to the client and back once to initialize AWDL focus tracking. The new dropdown controls the already installed worker through the existing private control file. It does not install the newer worker binary from this source tree; a later administrator update can apply the worker's reviewed crash-recovery/focus fixes separately.
 

@@ -8,6 +8,8 @@
 
 #include <QMenu>
 
+class MacSmoothModeController;
+
 // User-level controls for the separately installed, fixed-purpose AWDL worker.
 // Creating the menu never installs services or changes interface flags.
 class MacSmoothModeMenu : public QMenu
@@ -23,9 +25,8 @@ Q_SIGNALS:
   void controlError(const QString &message);
 
 private:
-  void writeControl(const QByteArray &value);
-  QString m_controlPath;
-  QString m_statusPath;
+  void updateControls();
+  MacSmoothModeController *m_controller;
   QAction *m_summary;
   QAction *m_automatic;
   QAction *m_airdrop;
