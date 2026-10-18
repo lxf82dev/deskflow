@@ -34,6 +34,8 @@ Build with `BUILD_MACOS_SMOOTH_MODE=ON` to produce the optional package under `b
 
 Administrator installation is separate on each Mac. The controller follows ordered Deskflow Info logs, disables `awdl0` while the client is active, suppresses unexpected re-enabling, and releases its suppression on return to the server or loss of known focus. The menu offers automatic mode and a temporary AirDrop override. During a transfer while controlling the client, allow AirDrop on both Macs. Suppression and AirDrop cannot operate simultaneously on the same interface.
 
+The fork now provides these controls in its own macOS menu-bar dropdown under **Smooth Mode**, including controller status and log access. It uses the existing worker/control-file protocol and needs no additional permission for those controls. The separate DF menu app can be unloaded while using the fork; the privileged worker remains installed. A [reversible two-Mac test package](../tools/macos-fork-test/README.md) prepares the fork and temporarily unloads the old menu and input relay without replacing the official app.
+
 The privileged worker can change only `awdl0`. It has no network listener, arbitrary command facility, input capture, setuid bit or sudoers modification. Its installer and removal behavior are described in the [component guide](../tools/macos-smooth-mode/README.md). The existing deployed controller may remain in use; this component retains its service labels and log format.
 
 ## Development build on macOS
@@ -63,9 +65,11 @@ This development configuration produces `build/bin/Deskflow` and `build/bin/desk
 
 After the review corrections on 18 October 2026, both Deskflow executables and the optional helper package built successfully. All nine selected native/protocol/settings suites and all three AWDL suites passed. The pinned clang-format 20.1.0 check, REUSE license lint and strict helper-app signature verification passed. The installed Deskflow and helpers were not replaced.
 
+The subsequent integrated Smooth Mode menu adds `MacSmoothModeMenuTests`: controls use the existing worker protocol, stale/missing status disables controls, expired AirDrop overrides are reflected, construction leaves preferences untouched, and an invalid/symlinked control file reports an error without replacing it. The expanded set of ten native/GUI suites plus three simulated helper suites passes. The temporary migration commands are syntax-checked; their actual service stop/start and rollback still require the live two-Mac test.
+
 ```sh
 ctest --test-dir build/src/unittests \
-  -R '^(OSXComputerTests|OSXInputCompatibilityTests|KeySequenceTests|SettingsTests|KeyStateTests|ComputerNavigationTests|ClientProxyTests|ServerProxyTests|ServerConfigDialogTests)$' \
+  -R '^(MacSmoothModeMenuTests|OSXComputerTests|OSXInputCompatibilityTests|KeySequenceTests|SettingsTests|KeyStateTests|ComputerNavigationTests|ClientProxyTests|ServerProxyTests|ServerConfigDialogTests)$' \
   --output-on-failure
 ctest --test-dir build/tools/macos-smooth-mode --output-on-failure
 ```

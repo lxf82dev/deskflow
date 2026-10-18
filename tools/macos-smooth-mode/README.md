@@ -55,6 +55,8 @@ The installer refuses a role that differs from Deskflow's saved mode. It preserv
 
 ## Controls
 
+The native fork also exposes these controls under **Deskflow's menu-bar icon → Smooth Mode**. It communicates with the same installed worker. You can unload the separate DF menu agent while using the fork; do not uninstall the worker or disable its file logging. See the [temporary migration guide](../macos-fork-test/README.md). The legacy installer still installs the standalone DF menu for users of the official Deskflow build.
+
 The **DF** menu bar icon offers:
 
 - **Automatic smoothing**: toggle the automatic controller. Turning it off permits AWDL.

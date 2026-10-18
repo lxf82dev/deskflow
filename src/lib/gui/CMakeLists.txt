@@ -8,6 +8,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 if(APPLE)
   set (platform_sources
+    MacSmoothModeMenu.h
+    MacSmoothModeMenu.cpp
     OSXHelpers.h
     OSXHelpers.mm
   )
